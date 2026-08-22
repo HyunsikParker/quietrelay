@@ -1,0 +1,36 @@
+[project]
+name = "quietrelay"
+version = "0.1.0"
+description = "A privacy-minimizing Good Neighbor agent for community operations."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "ollama==0.6.2",
+    "strands-agents==1.53.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4,<9",
+    "ruff>=0.12,<1",
+]
+
+[build-system]
+requires = ["hatchling==1.32.0"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+build-constraint-dependencies = ["hatchling==1.32.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/quietrelay"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
