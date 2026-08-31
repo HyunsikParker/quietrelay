@@ -7,18 +7,20 @@ type DecisionPanelProps = {
   mobile?: boolean;
   outcome: "held" | "substituted" | null;
   option: "hold" | "substitute";
+  substituteAvailableUnits: number;
   onOptionChange: (option: "hold" | "substitute") => void;
   onApprove: () => void;
   onUndo: () => void;
   onClose: () => void;
 };
 
-export function DecisionPanel({ busy, mobile = false, outcome, option, onOptionChange, onApprove, onUndo, onClose }: DecisionPanelProps) {
+export function DecisionPanel({ busy, mobile = false, outcome, option, substituteAvailableUnits, onOptionChange, onApprove, onUndo, onClose }: DecisionPanelProps) {
   const recorded = outcome !== null;
   const radioName = mobile ? "decision-mobile" : "decision-desktop";
   const shortageUnits = SHORTAGE_REVIEW.need.units - SHORTAGE_REVIEW.availableUnits;
   const substituteAvailable = SHORTAGE_REVIEW.substitute.approved
-    && SHORTAGE_REVIEW.substitute.availableUnits >= shortageUnits;
+    && substituteAvailableUnits >= shortageUnits;
+  const approvalAvailable = option === "hold" || substituteAvailable;
   return (
     <aside className={mobile ? "decision-panel decision-panel--sheet" : "decision-panel"} aria-label="Decision evidence">
       {mobile ? <div className="sheet-handle" aria-hidden="true" /> : null}
@@ -40,7 +42,7 @@ export function DecisionPanel({ busy, mobile = false, outcome, option, onOptionC
             <ul>
               <li><Box aria-hidden="true" /><span>Need {SHORTAGE_REVIEW.need.units} units · {SHORTAGE_REVIEW.availableUnits} available</span></li>
               <li><CalendarDays aria-hidden="true" /><span>Earliest expiry {SHORTAGE_REVIEW.earliestExpiry}</span></li>
-              <li><BadgeCheck aria-hidden="true" /><span>{SHORTAGE_REVIEW.substitute.item} approved · {SHORTAGE_REVIEW.substitute.availableUnits} available</span></li>
+              <li><BadgeCheck aria-hidden="true" /><span>{SHORTAGE_REVIEW.substitute.item} approved · {substituteAvailableUnits} available</span></li>
               <li><Users aria-hidden="true" /><span>{SHORTAGE_REVIEW.volunteerId} available</span></li>
             </ul>
           </section>
@@ -52,11 +54,11 @@ export function DecisionPanel({ busy, mobile = false, outcome, option, onOptionC
             </label>
             <label className={option === "substitute" ? "option-row option-row--selected" : "option-row"}>
               <input type="radio" name={radioName} checked={option === "substitute"} disabled={!substituteAvailable} onChange={() => onOptionChange("substitute")} />
-              <span>Use approved substitute</span>
+              <span>Use approved substitute{substituteAvailable ? "" : ` · needs ${shortageUnits}, ${substituteAvailableUnits} left`}</span>
             </label>
           </fieldset>
           <div className="decision-actions">
-            <button className="primary-button" type="button" disabled={busy} onClick={onApprove}>Approve decision<Chevron /></button>
+            <button className="primary-button" type="button" disabled={busy || !approvalAvailable} onClick={onApprove}>Approve decision<Chevron /></button>
             <button className="secondary-button" type="button" onClick={onClose}>Keep pending</button>
           </div>
         </>

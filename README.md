@@ -7,10 +7,11 @@ stops and gives a coordinator the evidence needed to decide what happens next.
 
 The repository has two working parts:
 
-- A Strands agent that runs against a local Ollama model and a deterministic
-  planning tool.
-- A responsive web console that sends one synthetic fixture to the loopback
-  agent, then demonstrates the review, approval, audit, and undo flow.
+- A Strands agent that runs three policy-constrained tools against a local
+  Ollama model and a deterministic stock-aware recovery planner.
+- A responsive web console that first shows the submitted control for one
+  synthetic fixture, then makes the loopback recovery delta visible alongside
+  the review, approval, audit, and undo flow.
 
 Neither part sends messages, spends money, or dispatches a volunteer.
 
@@ -20,28 +21,32 @@ Neither part sends messages, spends money, or dispatches a volunteer.
    unknown fields inside every record. Source IDs are replaced with short
    per-run handles, while items and zones come from small local catalogs.
 2. The deterministic planner validates record counts, units, dates, duplicate
-   identifiers, and volunteer capacity. It uses first-expire, first-out stock
-   ordering.
-3. QuietRelay binds the validated result to a Strands tool with no arguments.
-   The model cannot rewrite IDs, dates, stock counts, or capacity in its tool
-   call.
-4. The local model exercises the tool call, but its prose is not authoritative.
-   The CLI prints the deterministic plan with an empty `external_actions` list.
+   identifiers, and volunteer capacity. It stages first-expire, first-out stock,
+   then commits it only after an augmenting path safely assigns volunteer
+   capacity.
+3. `inspect_conflicts` exposes only two allowlisted option IDs and aggregate
+   counts. `select_recovery` accepts only the policy-best option, and
+   `validate_recovery` independently checks stock, expiry, zone, capacity, and
+   provenance.
+4. The local model must complete those three tools in order, but its prose is
+   ignored. The CLI prints the validated plan with an empty `external_actions`
+   list.
 
 ```mermaid
 flowchart LR
     A[Synthetic request, stock, and volunteer JSON] --> B[Strict field and size validation]
-    B --> C[Deterministic FEFO planner]
-    C --> D[Prevalidated no-argument Strands tool]
-    D --> E[Bounded local Ollama tool exercise]
-    C --> F[Authoritative allocation and review JSON]
+    B --> C[Stock-aware FEFO and augmenting-path options]
+    C --> D[Inspect fixed aggregate conflicts]
+    D --> E[Select one allowlisted recovery]
+    E --> F[Independently validate typed constraints]
+    F --> G[Authoritative allocation and review JSON]
 
-    G[Synthetic console fixture] --> A
-    F --> H[Coordinator review]
-    H --> I[Local approval or undo]
-    I --> J[Local activity ledger]
+    H[Synthetic console fixture] --> A
+    G --> I[Coordinator review]
+    I --> J[Local approval or undo]
+    J --> K[Local activity ledger]
 
-    J --> K[No message, payment, or real-world dispatch]
+    K --> L[No message, payment, or real-world dispatch]
 ```
 
 ## Privacy and safety
@@ -71,9 +76,11 @@ uv run python scripts/demo_local.py
 
 Run `ollama serve` in a separate terminal after the model is present. Before
 inference, the script verifies the exact local model digest. It exercises the
-no-argument Strands tool in a killable child process with fixed wall-clock,
-turn, and token limits, then prints the deterministic plan rather than the
-model's free-form prose.
+three policy-constrained Strands tools in a killable child process with fixed
+wall-clock, turn, and token limits, then prints the typed plan rather than the
+model's free-form prose. The fixture demonstrates safe volunteer reassignment:
+the submitted greedy control resolves one request, while the recovery plan
+resolves both without changing stock policy.
 
 ## Run the integrated console
 
@@ -88,10 +95,16 @@ uv run python scripts/serve_local.py
 ```
 
 Open `http://127.0.0.1:4173`. Select **Run local agent** to verify the pinned
-model digest, exercise the bound Strands tool, and load the authoritative plan.
+model digest, execute inspect, select, and validate, and load the authoritative
+recovery plan. The cold-start table shows the submitted control with three safe
+allocations and two local decisions. The verified recovery reassigns capacity
+to show four safe allocations and one local decision, without dispatching or
+sending anything.
 The interface supports zone filtering, decision review, a held-stock state, an
 approved oats substitute, an append-only activity ledger for the session, and
-undo. Desktop and mobile use the same local state.
+undo. Substitute availability is recalculated from the current authoritative
+allocations, so a recovery that consumes stock disables an insufficient option
+before approval. Desktop and mobile use the same local state.
 
 ## Verify the repository
 
@@ -104,5 +117,6 @@ npm run lint
 ```
 
 The Python suite covers schema rejection, privacy limits, FEFO allocation,
-shortage review, volunteer capacity, the bound Strands tool, loopback origin
-checks, static path safety, and the integrated plan endpoint.
+stock-scarcity regressions, augmenting paths, multi-need and capacity stress,
+the three Strands tools, loopback origin checks, static path safety, and the
+integrated plan endpoint.

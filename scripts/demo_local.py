@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 
-from quietrelay.agent import run_local_plan
+from quietrelay import run_local_plan
 
 
 def main() -> int:
@@ -16,18 +16,33 @@ def main() -> int:
                 "request_id": "req-9001",
                 "zone": "north",
                 "urgency": 5,
-                "needs": [{"item": "rice", "units": 2}],
-            }
+                "needs": [{"item": "rice", "units": 1}],
+            },
+            {
+                "request_id": "req-9002",
+                "zone": "south",
+                "urgency": 4,
+                "needs": [{"item": "oats", "units": 1}],
+            },
         ],
         "stock": [
             {
                 "lot_id": "lot-9001",
                 "item": "rice",
-                "units": 2,
+                "units": 1,
                 "expires_on": "2026-08-23",
-            }
+            },
+            {
+                "lot_id": "lot-9002",
+                "item": "oats",
+                "units": 1,
+                "expires_on": "2026-08-24",
+            },
         ],
-        "volunteers": [{"volunteer_id": "vol-9001", "zones": ["north"], "capacity": 1}],
+        "volunteers": [
+            {"volunteer_id": "vol-9001", "zones": ["north", "south"], "capacity": 1},
+            {"volunteer_id": "vol-9002", "zones": ["north"], "capacity": 1},
+        ],
     }
     serialized_payload = json.dumps(payload, separators=(",", ":"), sort_keys=True)
     print(run_local_plan(serialized_payload))

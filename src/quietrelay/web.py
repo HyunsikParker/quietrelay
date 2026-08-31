@@ -14,7 +14,8 @@ from socketserver import ThreadingMixIn
 from typing import Any
 from urllib.parse import unquote, urlsplit
 
-from .agent import MAX_PAYLOAD_BYTES, run_local_plan
+from .agent import MAX_PAYLOAD_BYTES
+from .rank1_candidate_v2 import run_rank1_plan_v2 as run_local_plan
 
 LOCAL_HOST = "127.0.0.1"
 DEFAULT_PORT = 4173

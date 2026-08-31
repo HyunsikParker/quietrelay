@@ -11,6 +11,21 @@ import { TopBar } from "./components/TopBar";
 import { runLocalPlan, type AuthoritativePlan } from "./api";
 import { DEMO_PAYLOAD, INITIAL_LEDGER, INITIAL_ROWS, REQUEST_ZONES, SHORTAGE_REVIEW, type LedgerEntry, type PlanRow } from "./data";
 
+function remainingSubstituteUnits(result: AuthoritativePlan) {
+  const substituteItem = SHORTAGE_REVIEW.substitute.item.toLowerCase();
+  const stockUnits = DEMO_PAYLOAD.stock.find((lot) => lot.item === substituteItem)?.units;
+  if (typeof stockUnits !== "number" || !Number.isSafeInteger(stockUnits) || stockUnits < 0) throw new Error();
+  const usedUnits = result.plan.allocations.reduce(
+    (total, allocation) => total + allocation.items.reduce(
+      (allocationTotal, item) => allocationTotal + (item.item === substituteItem ? item.units : 0),
+      0,
+    ),
+    0,
+  );
+  if (!Number.isSafeInteger(usedUnits) || usedUnits < 0 || usedUnits > stockUnits) throw new Error();
+  return stockUnits - usedUnits;
+}
+
 export function App() {
   const [collapsed, setCollapsed] = useState(false);
   const [zone, setZone] = useState("All");
@@ -21,6 +36,7 @@ export function App() {
   const [ledger, setLedger] = useState<LedgerEntry[]>(INITIAL_LEDGER);
   const [openLedgerId, setOpenLedgerId] = useState<string | null>(null);
   const [sourceRows, setSourceRows] = useState<PlanRow[]>(INITIAL_ROWS);
+  const [substituteAvailableUnits, setSubstituteAvailableUnits] = useState<number>(SHORTAGE_REVIEW.substitute.availableUnits);
   const [agentState, setAgentState] = useState<"idle" | "running" | "ready" | "error" | "stale">("idle");
   const eventCounter = useRef(1);
   const outcomeRef = useRef<"held" | "substituted" | null>(null);
@@ -54,11 +70,12 @@ export function App() {
 
   function rowsFromPlan(result: AuthoritativePlan): PlanRow[] {
     const expected = {
-      "req-1": { volunteer: "vol-1", items: "lot-1:rice:2" },
+      "req-1": { volunteer: "vol-3", items: "lot-1:rice:2" },
       "req-2": { volunteer: "vol-2", items: "lot-2:milk:1" },
       "req-3": { volunteer: "vol-1", items: "lot-3:blankets:3" },
+      "req-5": { volunteer: "vol-1", items: "lot-4:oats:1" },
     } as const;
-    if (result.plan.allocations.length !== 3 || result.plan.reviews.length !== 1) throw new Error();
+    if (result.plan.allocations.length !== 4 || result.plan.reviews.length !== 1) throw new Error();
     const rows = new Map<string, PlanRow>();
     for (const allocation of result.plan.allocations) {
       const zone = REQUEST_ZONES[allocation.request_id];
@@ -86,6 +103,7 @@ export function App() {
     try {
       const result = await runLocalPlan(DEMO_PAYLOAD);
       const nextRows = rowsFromPlan(result);
+      const nextSubstituteAvailableUnits = remainingSubstituteUnits(result);
       if (decisionRevisionRef.current !== decisionRevision) {
         setAgentState("stale");
         return;
@@ -94,13 +112,14 @@ export function App() {
       setOutcome(null);
       setOption("hold");
       setSourceRows(nextRows);
+      setSubstituteAvailableUnits(nextSubstituteAvailableUnits);
       setSelectedId(SHORTAGE_REVIEW.requestId);
       setSheetOpen(true);
       setLedger((current) => [...current, {
         id: `agent-${eventCounter.current++}`,
         time: "Now",
-        label: "Local agent verified the plan",
-        detail: `${result.plan.allocations.length} allocations are ready and ${result.plan.reviews.length} ${result.plan.reviews.length === 1 ? "decision remains" : "decisions remain"} local. No external action was sent.`,
+        label: "Recovery improved the submitted control",
+        detail: `Inspect, select, and validate produced ${result.plan.allocations.length} safe allocations versus 3 for the control, with ${result.plan.reviews.length} local decision versus 2. ${nextSubstituteAvailableUnits} approved oats unit remains after current allocations, so the two-unit substitute is disabled. No external action was sent.`,
       }]);
       setAgentState("ready");
     } catch {
@@ -116,7 +135,7 @@ export function App() {
     if (
       option === "substitute"
       && (!SHORTAGE_REVIEW.substitute.approved
-        || SHORTAGE_REVIEW.substitute.availableUnits < shortageUnits
+        || substituteAvailableUnits < shortageUnits
         || !SHORTAGE_REVIEW.volunteerId)
     ) return;
     const nextOutcome = option === "hold" ? "held" : "substituted";
@@ -164,14 +183,14 @@ export function App() {
               <button className="secondary-button agent-button" type="button" disabled={agentState === "running"} onClick={runAgent}>{agentState === "running" ? <LoaderCircle className="spin" aria-hidden="true" /> : <CirclePlay aria-hidden="true" />}{agentState === "ready" ? "Run again" : agentState === "running" ? "Verifying locally" : "Run local agent"}</button>
               <button className="primary-button review-button" type="button" disabled={!reviewTarget} onClick={() => { if (reviewTarget) { setSelectedId(reviewTarget.id); setSheetOpen(true); } }}>{reviewTarget ? "Review decisions" : "No decisions pending"}<ArrowRight aria-hidden="true" /></button>
             </div>
-            <p className={`agent-status agent-status--${agentState}`} role="status">{agentState === "ready" ? "Model digest verified. The authoritative plan is shown below." : agentState === "error" ? "Local verification is unavailable. Check Ollama, then try again." : agentState === "stale" ? "The decision changed during verification. Run the local agent again." : "Runs on 127.0.0.1. Source identifiers never reach the model."}</p>
+            <p className={`agent-status agent-status--${agentState}`} role="status">{agentState === "ready" ? `Recovery verified: 4 ready versus 3 for the control, with 1 decision versus 2. ${substituteAvailableUnits} oats unit remains, so the two-unit substitute is unavailable.` : agentState === "running" ? "Comparing the submitted control with stock-aware recovery on 127.0.0.1." : agentState === "error" ? "Local verification is unavailable. Check Ollama, then try again." : agentState === "stale" ? "The decision changed during verification. Run the local agent again." : "Submitted control shown: 3 ready, 2 decisions. Source identifiers never reach the model."}</p>
           </header>
           <PlanTable rows={rows} selectedId={selectedId} onSelect={selectRow} />
         </section>
         <ActivityLedger entries={ledger} openId={openLedgerId} onToggle={(id) => setOpenLedgerId((current) => current === id ? null : id)} />
       </main>
-      <DecisionPanel busy={agentState === "running"} outcome={outcome} option={option} onOptionChange={setOption} onApprove={approveDecision} onUndo={undoDecision} onClose={() => setSheetOpen(false)} />
-      {sheetOpen && selectedId === SHORTAGE_REVIEW.requestId ? <div className="mobile-sheet"><DecisionPanel busy={agentState === "running"} mobile outcome={outcome} option={option} onOptionChange={setOption} onApprove={approveDecision} onUndo={undoDecision} onClose={() => setSheetOpen(false)} /></div> : null}
+      <DecisionPanel busy={agentState === "running"} outcome={outcome} option={option} substituteAvailableUnits={substituteAvailableUnits} onOptionChange={setOption} onApprove={approveDecision} onUndo={undoDecision} onClose={() => setSheetOpen(false)} />
+      {sheetOpen && selectedId === SHORTAGE_REVIEW.requestId ? <div className="mobile-sheet"><DecisionPanel busy={agentState === "running"} mobile outcome={outcome} option={option} substituteAvailableUnits={substituteAvailableUnits} onOptionChange={setOption} onApprove={approveDecision} onUndo={undoDecision} onClose={() => setSheetOpen(false)} /></div> : null}
       <MobileNav />
     </div>
   );
