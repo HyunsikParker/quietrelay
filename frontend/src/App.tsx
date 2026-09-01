@@ -10,6 +10,7 @@ import { Sidebar } from "./components/Sidebar";
 import { TopBar } from "./components/TopBar";
 import { runLocalPlan, type AuthoritativePlan } from "./api";
 import { DEMO_PAYLOAD, INITIAL_LEDGER, INITIAL_ROWS, REQUEST_ZONES, SHORTAGE_REVIEW, type LedgerEntry, type PlanRow } from "./data";
+import { getVerifiedReplayPlan, resolveExecutionMode } from "./replay";
 
 function remainingSubstituteUnits(result: AuthoritativePlan) {
   const substituteItem = SHORTAGE_REVIEW.substitute.item.toLowerCase();
@@ -27,6 +28,8 @@ function remainingSubstituteUnits(result: AuthoritativePlan) {
 }
 
 export function App() {
+  const executionMode = useMemo(() => resolveExecutionMode(window.location), []);
+  const isReplay = executionMode === "replay";
   const [collapsed, setCollapsed] = useState(false);
   const [zone, setZone] = useState("All");
   const [selectedId, setSelectedId] = useState<string>(SHORTAGE_REVIEW.requestId);
@@ -101,7 +104,7 @@ export function App() {
     const decisionRevision = decisionRevisionRef.current;
     setAgentState("running");
     try {
-      const result = await runLocalPlan(DEMO_PAYLOAD);
+      const result = isReplay ? getVerifiedReplayPlan() : await runLocalPlan(DEMO_PAYLOAD);
       const nextRows = rowsFromPlan(result);
       const nextSubstituteAvailableUnits = remainingSubstituteUnits(result);
       if (decisionRevisionRef.current !== decisionRevision) {
@@ -170,20 +173,25 @@ export function App() {
   }
 
   return (
-    <div className={`app-shell ${collapsed ? "app-shell--collapsed" : ""}`}>
+    <div className={`app-shell ${collapsed ? "app-shell--collapsed" : ""}`} data-execution-mode={executionMode}>
+      <a className="skip-link" href="#plan-workspace">Skip to today’s plan</a>
       <Sidebar collapsed={collapsed} onCollapse={() => setCollapsed((value) => !value)} />
       <div className="mobile-header"><Brand /><ShieldCheck aria-label="Local privacy boundary" /></div>
       <TopBar zone={zone} onZoneChange={setZone} onMenu={() => setCollapsed((value) => !value)} />
-      <main className="workspace">
+      <main className="workspace" id="plan-workspace">
         <section className="plan-workspace">
           <header className="plan-header">
+            <div className={`mode-disclosure mode-disclosure--${executionMode}`} role="note">
+              <ShieldCheck aria-hidden="true" />
+              <span><strong>{isReplay ? "Verified replay — no live model" : "Live local model"}</strong><small>{isReplay ? "Frozen, previously validated result · no API request" : "Runs only through this device’s local API"}</small></span>
+            </div>
             <h1>Today’s plan</h1>
             <p>{readyCount} clear {readyCount === 1 ? "match is" : "matches are"} ready. {unresolved === 0 ? "No decisions need you." : `${unresolved} ${unresolved === 1 ? "decision needs" : "decisions need"} you.`}</p>
             <div className="plan-actions">
-              <button className="secondary-button agent-button" type="button" disabled={agentState === "running"} onClick={runAgent}>{agentState === "running" ? <LoaderCircle className="spin" aria-hidden="true" /> : <CirclePlay aria-hidden="true" />}{agentState === "ready" ? "Run again" : agentState === "running" ? "Verifying locally" : "Run local agent"}</button>
+              <button className="secondary-button agent-button" type="button" disabled={agentState === "running"} onClick={runAgent}>{agentState === "running" ? <LoaderCircle className="spin" aria-hidden="true" /> : <CirclePlay aria-hidden="true" />}{isReplay ? (agentState === "ready" ? "Replay again" : agentState === "running" ? "Replaying locally" : "Replay verified run") : (agentState === "ready" ? "Run again" : agentState === "running" ? "Verifying locally" : "Run local agent")}</button>
               <button className="primary-button review-button" type="button" disabled={!reviewTarget} onClick={() => { if (reviewTarget) { setSelectedId(reviewTarget.id); setSheetOpen(true); } }}>{reviewTarget ? "Review decisions" : "No decisions pending"}<ArrowRight aria-hidden="true" /></button>
             </div>
-            <p className={`agent-status agent-status--${agentState}`} role="status">{agentState === "ready" ? `Recovery verified: 4 ready versus 3 for the control, with 1 decision versus 2. ${substituteAvailableUnits} oats unit remains, so the two-unit substitute is unavailable.` : agentState === "running" ? "Comparing the submitted control with stock-aware recovery on 127.0.0.1." : agentState === "error" ? "Local verification is unavailable. Check Ollama, then try again." : agentState === "stale" ? "The decision changed during verification. Run the local agent again." : "Submitted control shown: 3 ready, 2 decisions. Source identifiers never reach the model."}</p>
+            <p className={`agent-status agent-status--${agentState}`} role="status">{agentState === "ready" ? `${isReplay ? "Verified replay complete" : "Recovery verified"}: 4 ready versus 3 for the control, with 1 decision versus 2. ${substituteAvailableUnits} oats unit remains, so the two-unit substitute is unavailable.` : agentState === "running" ? (isReplay ? "Replaying the verified result locally. No model or API is running." : "Comparing the submitted control with stock-aware recovery on 127.0.0.1.") : agentState === "error" ? (isReplay ? "The verified replay could not be validated. Reload and try once more." : "Local verification is unavailable. Check Ollama, then try again.") : agentState === "stale" ? `The decision changed during ${isReplay ? "replay" : "verification"}. Run it again.` : (isReplay ? "Submitted control shown: 3 ready, 2 decisions. Replay uses a frozen verified result and makes no API request." : "Submitted control shown: 3 ready, 2 decisions. Source identifiers never reach the model.")}</p>
           </header>
           <PlanTable rows={rows} selectedId={selectedId} onSelect={selectRow} />
         </section>

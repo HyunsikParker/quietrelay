@@ -24,7 +24,7 @@ function isShortHandle(value: unknown, prefix: string) {
   return typeof value === "string" && new RegExp(`^${prefix}-[0-9]{1,4}$`).test(value);
 }
 
-function parsePlan(value: unknown): AuthoritativePlan {
+export function parseAuthoritativePlan(value: unknown): AuthoritativePlan {
   if (!isRecord(value) || !hasExactKeys(value, ["external_actions", "plan"])) throw new Error();
   if (!Array.isArray(value.external_actions) || value.external_actions.length !== 0) throw new Error();
   if (!isRecord(value.plan) || !hasExactKeys(value.plan, ["allocations", "reviews"])) throw new Error();
@@ -62,7 +62,7 @@ export async function runLocalPlan(payload: unknown): Promise<AuthoritativePlan>
     if (!response.ok || !response.headers.get("Content-Type")?.startsWith("application/json")) throw new Error();
     const text = await response.text();
     if (text.length > MAX_RESPONSE_CHARACTERS) throw new Error();
-    return parsePlan(JSON.parse(text));
+    return parseAuthoritativePlan(JSON.parse(text));
   } finally {
     window.clearTimeout(timer);
   }
