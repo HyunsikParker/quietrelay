@@ -87,6 +87,8 @@ h3 span { margin-left: 8px; font-weight: 400; color: var(--muted); }
 .activity summary span { float: right; color: var(--muted); font-size: 11px; }
 .activity ol { padding-left: 20px; color: var(--muted); line-height: 1.7; }
 .activity li { margin-bottom: 8px; }
+.review-export { margin: 24px 20px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.review-export p { flex: 1; min-width: 180px; font-size: 12px; line-height: 1.6; color: var(--muted); }
 .empty-plan { min-height: 320px; padding: 50px 20px; border-top: 1px solid var(--line); margin: 0 20px; }
 .empty-plan > span { font-size: 38px; color: #455d4a; }
 .empty-plan h3 { margin: 16px 0 10px; }

@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from "react";
 import { Brand } from "./components/Brand";
 import { runLocalPlan, type AuthoritativePlan } from "./api";
 import { resolveExecutionMode } from "./replay";
+import { reviewText } from "./review";
 import { initialPayload, previewPlan, selectedPreview, validateInput, validateResult, type Payload } from "./planner";
 
 const title = (s: string) => s[0].toUpperCase() + s.slice(1);
@@ -75,6 +76,18 @@ export function App() {
     setDecisions(d => { const next = { ...d }; delete next[selected]; return next; });
     setActivity(a => [`Plan ${revision} · ${selected} decision undone.`, ...a].slice(0, 30));
   }
+  function saveReview() {
+    if (running.current || !result || resultKind === "Control plan") return;
+    try {
+      const text = reviewText(payload, result, decisions, live ? "agent" : "preview");
+      const url = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }));
+      const link = document.createElement("a");
+      link.href = url; link.download = `quietrelay-review-plan-${revision}.txt`;
+      document.body.append(link); link.click(); link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setError(false); setStatus("Review download requested. The snapshot includes all requests, current inputs and local decisions.");
+    } catch (e) { setError(true); setStatus(e instanceof Error ? e.message : "Review could not be saved."); }
+  }
 
   return <div className="console">
     <a className="skip-link" href="#results">Skip to plan</a>
@@ -107,6 +120,7 @@ export function App() {
             })}{!payload.requests.some(r => zone === "all" || r.zone === zone) && <p className="field-help">No requests in this zone.</p>}</div>
             {(allocation || review) && <section className="evidence" aria-labelledby="evidence-title"><div className="evidence-heading"><p className="eyebrow">Review</p><h3 id="evidence-title">{selected} <span>{allocation ? "Allocation evidence" : "Needs a decision"}</span></h3></div><div className="evidence-body"><div>{allocation ? <><p>{allocation.items.map(i => `${i.units} ${i.item} from ${i.lot_id}`).join("; ")}.</p><p>{allocation.volunteer_id} covers {title(selectedRequest.zone)}. Stock and capacity are included in this plan.</p></> : <><p className="review-reason">{review?.reason === "inventory_shortage" ? "Not enough unexpired stock" : "No available volunteer capacity"}</p>{review?.evidence.map(e => <p key={e}>{e}</p>)}<p>Add the missing resource and replan, or mark this request for follow-up.</p></>}<p className="boundary-note">{allocation ? "Approval records a local decision. It does not dispatch a volunteer." : "Follow-up does not reserve stock or complete the request."}</p></div><div className="decision-actions">{decisions[selected] ? <><p className="decision-saved"><Check size={16} /> {decisions[selected] === "approved" ? "Approved locally" : "Marked for follow-up"}</p><button className="secondary-button" disabled={busy} onClick={undo}>Undo decision</button></> : <button className="secondary-button" disabled={busy} onClick={decide}>{allocation ? "Approve locally" : "Mark for follow-up"}</button>}</div></div></section>}
           </>}
+          <div className="review-export"><button className="secondary-button" disabled={busy || !result || resultKind === "Control plan"} onClick={saveReview}>Save review</button><p>Save all requests and current decisions as a text file. Replan first. Unreviewed requests remain marked as pending.</p></div>
           <details className="activity"><summary>Activity <span>{activity.length} {activity.length === 1 ? "event" : "events"}</span></summary>{activity.length ? <ol>{activity.map((a, i) => <li key={`${activity.length - i}-${a}`}>{a}</li>)}</ol> : <p>No decisions recorded yet.</p>}</details>
         </section>
       </div>
