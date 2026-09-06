@@ -1,205 +1,116 @@
-import { ArrowRight, CirclePlay, LoaderCircle, ShieldCheck } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, LoaderCircle, RotateCcw } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
-
-import { ActivityLedger } from "./components/ActivityLedger";
 import { Brand } from "./components/Brand";
-import { DecisionPanel } from "./components/DecisionPanel";
-import { MobileNav } from "./components/MobileNav";
-import { PlanTable } from "./components/PlanTable";
-import { Sidebar } from "./components/Sidebar";
-import { TopBar } from "./components/TopBar";
 import { runLocalPlan, type AuthoritativePlan } from "./api";
-import { DEMO_PAYLOAD, INITIAL_LEDGER, INITIAL_ROWS, REQUEST_ZONES, SHORTAGE_REVIEW, type LedgerEntry, type PlanRow } from "./data";
-import { getVerifiedReplayPlan, resolveExecutionMode } from "./replay";
+import { resolveExecutionMode } from "./replay";
+import { initialPayload, previewPlan, selectedPreview, validateInput, validateResult, type Payload } from "./planner";
 
-function remainingSubstituteUnits(result: AuthoritativePlan) {
-  const substituteItem = SHORTAGE_REVIEW.substitute.item.toLowerCase();
-  const stockUnits = DEMO_PAYLOAD.stock.find((lot) => lot.item === substituteItem)?.units;
-  if (typeof stockUnits !== "number" || !Number.isSafeInteger(stockUnits) || stockUnits < 0) throw new Error();
-  const usedUnits = result.plan.allocations.reduce(
-    (total, allocation) => total + allocation.items.reduce(
-      (allocationTotal, item) => allocationTotal + (item.item === substituteItem ? item.units : 0),
-      0,
-    ),
-    0,
-  );
-  if (!Number.isSafeInteger(usedUnits) || usedUnits < 0 || usedUnits > stockUnits) throw new Error();
-  return stockUnits - usedUnits;
-}
+const title = (s: string) => s[0].toUpperCase() + s.slice(1);
+const zones = ["north", "east", "south"];
+type InputTab = "Stock" | "Requests" | "Volunteers";
 
 export function App() {
-  const executionMode = useMemo(() => resolveExecutionMode(window.location), []);
-  const isReplay = executionMode === "replay";
-  const [collapsed, setCollapsed] = useState(false);
-  const [zone, setZone] = useState("All");
-  const [selectedId, setSelectedId] = useState<string>(SHORTAGE_REVIEW.requestId);
-  const [option, setOption] = useState<"hold" | "substitute">("hold");
-  const [outcome, setOutcome] = useState<"held" | "substituted" | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(true);
-  const [ledger, setLedger] = useState<LedgerEntry[]>(INITIAL_LEDGER);
-  const [openLedgerId, setOpenLedgerId] = useState<string | null>(null);
-  const [sourceRows, setSourceRows] = useState<PlanRow[]>(INITIAL_ROWS);
-  const [substituteAvailableUnits, setSubstituteAvailableUnits] = useState<number>(SHORTAGE_REVIEW.substitute.availableUnits);
-  const [agentState, setAgentState] = useState<"idle" | "running" | "ready" | "error" | "stale">("idle");
-  const eventCounter = useRef(1);
-  const outcomeRef = useRef<"held" | "substituted" | null>(null);
-  const agentRunningRef = useRef(false);
-  const decisionRevisionRef = useRef(0);
+  const live = useMemo(() => resolveExecutionMode(window.location) === "live", []);
+  const [payload, setPayload] = useState<Payload>(initialPayload);
+  const [inputTab, setInputTab] = useState<InputTab>("Stock");
+  const [result, setResult] = useState<AuthoritativePlan | null>(() => previewPlan(initialPayload(), false));
+  const [resultKind, setResultKind] = useState("Control plan");
+  const [selected, setSelected] = useState("req-4");
+  const [zone, setZone] = useState("all");
+  const [busy, setBusy] = useState(false);
+  const running = useRef(false);
+  const resultHeading = useRef<HTMLHeadingElement>(null);
+  const [status, setStatus] = useState("Change a quantity, then replan to see what changes.");
+  const [error, setError] = useState(false);
+  const [decisions, setDecisions] = useState<Record<string, "approved" | "held">>({});
+  const [activity, setActivity] = useState<string[]>([]);
+  const [revision, setRevision] = useState(1);
+  const baselineCount = useMemo(() => { try { return previewPlan(payload, false).plan.allocations.length; } catch { return null; } }, [payload]);
+  const allocation = result?.plan.allocations.find(a => a.request_id === selected);
+  const review = result?.plan.reviews.find(r => r.request_id === selected);
+  const selectedRequest = payload.requests[Number(selected.split("-")[1]) - 1];
+  const counts = result ? { ready: result.plan.allocations.length, review: result.plan.reviews.length } : null;
 
-  const canonicalRows = useMemo<PlanRow[]>(
-    () => sourceRows
-      .map((row) => {
-        if (row.id !== SHORTAGE_REVIEW.requestId || outcome === null) return row;
-        if (outcome === "held") {
-          return { ...row, allocation: `${SHORTAGE_REVIEW.need.item} · ${SHORTAGE_REVIEW.availableUnits} units held`, status: "Held" as const };
-        }
-        const shortageUnits = SHORTAGE_REVIEW.need.units - SHORTAGE_REVIEW.availableUnits;
-        return { ...row, allocation: `${SHORTAGE_REVIEW.need.item} · ${SHORTAGE_REVIEW.availableUnits} + ${SHORTAGE_REVIEW.substitute.item} · ${shortageUnits}`, volunteer: SHORTAGE_REVIEW.volunteerId, status: "Ready" as const };
-      }),
-    [outcome, sourceRows],
-  );
-  const rows = useMemo(
-    () => canonicalRows.filter((row) => zone === "All" || row.zone === zone),
-    [canonicalRows, zone],
-  );
-  const readyCount = canonicalRows.filter((row) => row.status === "Ready").length;
-  const unresolved = canonicalRows.filter((row) => row.status !== "Ready").length;
-  const reviewTarget = canonicalRows.find((row) => row.status !== "Ready");
-
-  function selectRow(row: PlanRow) {
-    setSelectedId(row.id);
-    if (row.id === SHORTAGE_REVIEW.requestId) setSheetOpen(true);
+  function edit(change: (p: Payload) => void) {
+    if (running.current) return;
+    const next = structuredClone(payload); change(next); setPayload(next);
+    setResult(null); setDecisions({}); setError(false);
+    setStatus("Inputs changed. Replan before reviewing or approving.");
   }
-
-  function rowsFromPlan(result: AuthoritativePlan): PlanRow[] {
-    const expected = {
-      "req-1": { volunteer: "vol-3", items: "lot-1:rice:2" },
-      "req-2": { volunteer: "vol-2", items: "lot-2:milk:1" },
-      "req-3": { volunteer: "vol-1", items: "lot-3:blankets:3" },
-      "req-5": { volunteer: "vol-1", items: "lot-4:oats:1" },
-    } as const;
-    if (result.plan.allocations.length !== 4 || result.plan.reviews.length !== 1) throw new Error();
-    const rows = new Map<string, PlanRow>();
-    for (const allocation of result.plan.allocations) {
-      const zone = REQUEST_ZONES[allocation.request_id];
-      const required = expected[allocation.request_id as keyof typeof expected];
-      const itemSignature = allocation.items.map((item) => `${item.lot_id}:${item.item}:${item.units}`).join("|");
-      if (!zone || !required || rows.has(allocation.request_id) || allocation.volunteer_id !== required.volunteer || itemSignature !== required.items) throw new Error();
-      const items = allocation.items.map((item) => `${item.item[0].toUpperCase()}${item.item.slice(1)} · ${item.units} ${item.units === 1 ? "unit" : "units"}`);
-      rows.set(allocation.request_id, { id: allocation.request_id, zone, allocation: items.join(" + "), volunteer: allocation.volunteer_id, status: "Ready" });
-    }
-    for (const review of result.plan.reviews) {
-      const zone = REQUEST_ZONES[review.request_id];
-      if (!zone || rows.has(review.request_id) || review.request_id !== SHORTAGE_REVIEW.requestId || review.reason !== "inventory_shortage" || review.evidence.length !== 1 || review.evidence[0] !== "rice: need 4, available 2") throw new Error();
-      rows.set(review.request_id, { id: review.request_id, zone, allocation: `${SHORTAGE_REVIEW.need.item} · ${SHORTAGE_REVIEW.need.units} units`, volunteer: SHORTAGE_REVIEW.volunteerId, status: "Decision" });
-    }
-    const ordered = Object.keys(REQUEST_ZONES).map((id) => rows.get(id));
-    if (ordered.some((row) => row === undefined)) throw new Error();
-    return ordered as PlanRow[];
+  function reset() {
+    if (running.current) return;
+    const next = initialPayload(); setPayload(next); setResult(previewPlan(next, false));
+    setResultKind("Control plan"); setDecisions({}); setSelected("req-4"); setZone("all"); setRevision(r => r + 1);
+    setError(false); setStatus("Original sample restored. Earlier activity remains below.");
+    setActivity(a => ["Sample restored; previous approvals cleared.", ...a].slice(0, 30));
   }
-
-  async function runAgent() {
-    if (agentRunningRef.current) return;
-    agentRunningRef.current = true;
-    const decisionRevision = decisionRevisionRef.current;
-    setAgentState("running");
+  async function run() {
+    if (running.current) return;
+    try { validateInput(payload); } catch (e) { setError(true); setStatus(e instanceof Error ? e.message : "Check your inputs."); return; }
+    running.current = true; setBusy(true); setError(false);
+    setStatus(live ? "Local agent is inspecting, selecting and validating. This can take up to 50 seconds." : "Calculating from the current inputs…");
+    const submitted = structuredClone(payload);
     try {
-      const result = isReplay ? getVerifiedReplayPlan() : await runLocalPlan(DEMO_PAYLOAD);
-      const nextRows = rowsFromPlan(result);
-      const nextSubstituteAvailableUnits = remainingSubstituteUnits(result);
-      if (decisionRevisionRef.current !== decisionRevision) {
-        setAgentState("stale");
-        return;
-      }
-      outcomeRef.current = null;
-      setOutcome(null);
-      setOption("hold");
-      setSourceRows(nextRows);
-      setSubstituteAvailableUnits(nextSubstituteAvailableUnits);
-      setSelectedId(SHORTAGE_REVIEW.requestId);
-      setSheetOpen(true);
-      setLedger((current) => [...current, {
-        id: `agent-${eventCounter.current++}`,
-        time: "Now",
-        label: "Recovery improved the submitted control",
-        detail: `Inspect, select, and validate produced ${result.plan.allocations.length} safe allocations versus 3 for the control, with ${result.plan.reviews.length} local decision versus 2. ${nextSubstituteAvailableUnits} approved oats unit remains after current allocations, so the two-unit substitute is disabled. No external action was sent.`,
-      }]);
-      setAgentState("ready");
+      const start = performance.now();
+      const next = validateResult(submitted, live ? await runLocalPlan(submitted) : selectedPreview(submitted));
+      setResult(next); setZone("all"); setResultKind(live ? "Local agent result" : "Replanned allocations"); setDecisions({}); setRevision(r => r + 1);
+      setSelected(next.plan.reviews[0]?.request_id ?? next.plan.allocations[0]?.request_id ?? "req-1");
+      const elapsed = ((performance.now() - start) / 1000).toFixed(2);
+      setStatus(`Replanned from current inputs in ${elapsed}s. Nothing dispatched.`);
+      if (window.matchMedia("(max-width: 760px)").matches) requestAnimationFrame(() => resultHeading.current?.focus());
+      setActivity(a => [`${live ? "Local agent" : "Browser preview"}: ${next.plan.allocations.length} ready, ${next.plan.reviews.length} to review. All earlier approvals cleared.`, ...a].slice(0, 30));
     } catch {
-      setAgentState("error");
-    } finally {
-      agentRunningRef.current = false;
-    }
+      setResult(null); setDecisions({}); setError(true);
+      setStatus(live ? "Local agent could not verify this plan. Check that Ollama is running with the model in the README, then retry. No result was applied." : "This input could not be verified. Check the quantities and dates, then retry.");
+    } finally { running.current = false; setBusy(false); }
+  }
+  function decide() {
+    if (running.current || !result || decisions[selected]) return;
+    const state = allocation ? "approved" : "held";
+    setDecisions(d => ({ ...d, [selected]: state }));
+    setActivity(a => [`Plan ${revision} · ${selected} ${state === "approved" ? "approved locally" : "marked for follow-up; no stock reserved"}.`, ...a].slice(0, 30));
+  }
+  function undo() {
+    if (running.current || !decisions[selected]) return;
+    setDecisions(d => { const next = { ...d }; delete next[selected]; return next; });
+    setActivity(a => [`Plan ${revision} · ${selected} decision undone.`, ...a].slice(0, 30));
   }
 
-  function approveDecision() {
-    if (agentRunningRef.current || outcomeRef.current !== null) return;
-    const shortageUnits = SHORTAGE_REVIEW.need.units - SHORTAGE_REVIEW.availableUnits;
-    if (
-      option === "substitute"
-      && (!SHORTAGE_REVIEW.substitute.approved
-        || substituteAvailableUnits < shortageUnits
-        || !SHORTAGE_REVIEW.volunteerId)
-    ) return;
-    const nextOutcome = option === "hold" ? "held" : "substituted";
-    const id = `decision-${eventCounter.current++}`;
-    outcomeRef.current = nextOutcome;
-    decisionRevisionRef.current += 1;
-    setOutcome(nextOutcome);
-    setLedger((current) => [...current, {
-      id,
-      time: "Now",
-      label: nextOutcome === "held" ? "Stock held for review" : "Approved substitute applied",
-      detail: nextOutcome === "held"
-        ? `${SHORTAGE_REVIEW.availableUnits} rice units are held. The request remains open. No external action was sent.`
-        : `${shortageUnits} approved ${SHORTAGE_REVIEW.substitute.item.toLowerCase()} units complete the local allocation with ${SHORTAGE_REVIEW.volunteerId}. No external action was sent.`,
-    }]);
-    setSheetOpen(false);
-  }
+  return <div className="console">
+    <a className="skip-link" href="#results">Skip to plan</a>
+    <header className="masthead"><Brand /><div className="masthead-note">Community allocation desk</div><a href="https://github.com/HyunsikParker/quietrelay#run-the-integrated-console" target="_blank" rel="noreferrer">Run locally <ArrowRight size={15} /></a></header>
+    <main>
+      <div className="page-heading"><div><p className="eyebrow">Sample data · 22 Aug 2026</p><h1>Allocation plan</h1></div></div>
+      <div className="execution-note"><strong>{live ? "Live local agent" : "Interactive preview · no live model"}</strong><span>{live ? "Strands + Ollama on this device." : "Calculates in your browser. Run locally to use the Strands agent."}</span></div>
+      <div className="desk">
+        <section className="input-panel" aria-labelledby="input-title">
+          <div className="section-heading"><div><p className="eyebrow">Inputs</p><h2 id="input-title">Today’s resources</h2></div><button className="text-button" onClick={reset} disabled={busy} aria-label="Reset sample"><RotateCcw size={16} /> Reset</button></div>
+          <p className="panel-description">Five sample requests. Changes clear earlier results and approvals.</p>
+          <div className="input-tabs" role="group" aria-label="Scenario inputs">{(["Stock", "Requests", "Volunteers"] as const).map(t => <button type="button" id={`tab-${t}`} aria-controls={`panel-${t}`} aria-pressed={inputTab === t} key={t} onClick={() => setInputTab(t)}>{t}</button>)}</div>
+          <div className="input-footer"><button className="primary-button" type="button" disabled={busy} onClick={run}>{busy ? <LoaderCircle className="spin" size={18} /> : null}{busy ? "Verifying plan…" : live ? "Run local agent" : "Replan this sample"}{!busy && <ArrowRight size={18} />}</button><p>Exact items only. Expired stock is excluded.</p></div>
+          <fieldset disabled={busy} className="input-fields" id={`panel-${inputTab}`} aria-labelledby={`tab-${inputTab}`}>
+            {inputTab === "Stock" && payload.stock.map((s, i) => <div className="input-record" key={s.lot_id}><div className="record-label"><strong>{title(s.item)}</strong><span>lot-{i + 1}</span></div><div className="field-pair"><label>Units<input aria-label={`${title(s.item)} stock units`} type="number" min="1" max="100" value={Number.isNaN(s.units) ? "" : s.units} onChange={e => edit(p => { p.stock[i].units = e.target.valueAsNumber; })} /></label><label>Expires<input aria-label={`${title(s.item)} expiry`} type="date" value={s.expires_on} onChange={e => edit(p => { p.stock[i].expires_on = e.target.value; })} /></label></div></div>)}
+            {inputTab === "Requests" && payload.requests.map((r, i) => <div className="input-record" key={r.request_id}><div className="record-label"><strong>req-{i + 1}</strong><span>{title(r.needs[0].item)}</span></div><div className="field-triple"><label>Units<input aria-label={`Request ${i + 1} units`} type="number" min="1" max="100" value={Number.isNaN(r.needs[0].units) ? "" : r.needs[0].units} onChange={e => edit(p => { p.requests[i].needs[0].units = e.target.valueAsNumber; })} /></label><label>Priority<select aria-label={`Request ${i + 1} priority`} value={r.urgency} onChange={e => edit(p => { p.requests[i].urgency = Number(e.target.value); })}>{[5, 4, 3, 2, 1].map(n => <option key={n}>{n}</option>)}</select></label><label>Zone<select aria-label={`Request ${i + 1} zone`} value={r.zone} onChange={e => edit(p => { p.requests[i].zone = e.target.value; })}>{zones.map(z => <option key={z} value={z}>{title(z)}</option>)}</select></label></div></div>)}
+            {inputTab === "Volunteers" && <><p className="field-help">Capacity is the number of requests one volunteer can take.</p>{payload.volunteers.map((v, i) => <div className="input-record" key={v.volunteer_id}><div className="record-label"><strong>vol-{i + 1}</strong><span>{v.zones.map(title).join(" + ")}</span></div><label>Request capacity<input aria-label={`Volunteer ${i + 1} capacity`} type="number" min="1" max="10" value={Number.isNaN(v.capacity) ? "" : v.capacity} onChange={e => edit(p => { p.volunteers[i].capacity = e.target.valueAsNumber; })} /></label></div>)}</>}
+          </fieldset>
 
-  function undoDecision() {
-    if (agentRunningRef.current || outcomeRef.current === null) return;
-    const id = `decision-${eventCounter.current++}`;
-    outcomeRef.current = null;
-    decisionRevisionRef.current += 1;
-    setOutcome(null);
-    setLedger((current) => [...current, {
-      id,
-      time: "Now",
-      label: "Decision undone",
-      detail: "The request returned to review. Earlier activity remains visible. No external action was sent.",
-      review: true,
-    }]);
-  }
-
-  return (
-    <div className={`app-shell ${collapsed ? "app-shell--collapsed" : ""}`} data-execution-mode={executionMode}>
-      <a className="skip-link" href="#plan-workspace">Skip to today’s plan</a>
-      <Sidebar collapsed={collapsed} onCollapse={() => setCollapsed((value) => !value)} />
-      <div className="mobile-header"><Brand /><ShieldCheck aria-label="Local privacy boundary" /></div>
-      <TopBar zone={zone} onZoneChange={setZone} onMenu={() => setCollapsed((value) => !value)} />
-      <main className="workspace" id="plan-workspace">
-        <section className="plan-workspace">
-          <header className="plan-header">
-            <div className={`mode-disclosure mode-disclosure--${executionMode}`} role="note">
-              <ShieldCheck aria-hidden="true" />
-              <span><strong>{isReplay ? "Verified replay — no live model" : "Live local model"}</strong><small>{isReplay ? "Frozen, previously validated result · no API request" : "Runs only through this device’s local API"}</small></span>
-            </div>
-            <h1>Today’s plan</h1>
-            <p>{readyCount} clear {readyCount === 1 ? "match is" : "matches are"} ready. {unresolved === 0 ? "No decisions need you." : `${unresolved} ${unresolved === 1 ? "decision needs" : "decisions need"} you.`}</p>
-            <div className="plan-actions">
-              <button className="secondary-button agent-button" type="button" disabled={agentState === "running"} onClick={runAgent}>{agentState === "running" ? <LoaderCircle className="spin" aria-hidden="true" /> : <CirclePlay aria-hidden="true" />}{isReplay ? (agentState === "ready" ? "Replay again" : agentState === "running" ? "Replaying locally" : "Replay verified run") : (agentState === "ready" ? "Run again" : agentState === "running" ? "Verifying locally" : "Run local agent")}</button>
-              <button className="primary-button review-button" type="button" disabled={!reviewTarget} onClick={() => { if (reviewTarget) { setSelectedId(reviewTarget.id); setSheetOpen(true); } }}>{reviewTarget ? "Review decisions" : "No decisions pending"}<ArrowRight aria-hidden="true" /></button>
-            </div>
-            <p className={`agent-status agent-status--${agentState}`} role="status">{agentState === "ready" ? `${isReplay ? "Verified replay complete" : "Recovery verified"}: 4 ready versus 3 for the control, with 1 decision versus 2. ${substituteAvailableUnits} oats unit remains, so the two-unit substitute is unavailable.` : agentState === "running" ? (isReplay ? "Replaying the verified result locally. No model or API is running." : "Comparing the submitted control with stock-aware recovery on 127.0.0.1.") : agentState === "error" ? (isReplay ? "The verified replay could not be validated. Reload and try once more." : "Local verification is unavailable. Check Ollama, then try again.") : agentState === "stale" ? `The decision changed during ${isReplay ? "replay" : "verification"}. Run it again.` : (isReplay ? "Submitted control shown: 3 ready, 2 decisions. Replay uses a frozen verified result and makes no API request." : "Submitted control shown: 3 ready, 2 decisions. Source identifiers never reach the model.")}</p>
-          </header>
-          <PlanTable rows={rows} selectedId={selectedId} onSelect={selectRow} />
         </section>
-        <ActivityLedger entries={ledger} openId={openLedgerId} onToggle={(id) => setOpenLedgerId((current) => current === id ? null : id)} />
-      </main>
-      <DecisionPanel busy={agentState === "running"} outcome={outcome} option={option} substituteAvailableUnits={substituteAvailableUnits} onOptionChange={setOption} onApprove={approveDecision} onUndo={undoDecision} onClose={() => setSheetOpen(false)} />
-      {sheetOpen && selectedId === SHORTAGE_REVIEW.requestId ? <div className="mobile-sheet"><DecisionPanel busy={agentState === "running"} mobile outcome={outcome} option={option} substituteAvailableUnits={substituteAvailableUnits} onOptionChange={setOption} onApprove={approveDecision} onUndo={undoDecision} onClose={() => setSheetOpen(false)} /></div> : null}
-      <MobileNav />
-    </div>
-  );
+        <section className="result-panel" id="results" aria-labelledby="result-title" aria-busy={busy}>
+          <div className="section-heading"><div><p className="eyebrow">Plan {revision}</p><h2 id="result-title" ref={resultHeading} tabIndex={-1}>{result ? resultKind : "Ready to replan"}</h2></div><label className="zone-filter">Zone <select aria-label="Zone view" value={zone} onChange={e => { const next = e.target.value; setZone(next); const index = payload.requests.findIndex(r => next === "all" || r.zone === next); setSelected(index >= 0 ? `req-${index + 1}` : ""); }}><option value="all">All</option>{zones.map(z => <option value={z} key={z}>{title(z)}</option>)}</select></label></div>
+          <div className={`run-status ${error ? "run-status--error" : ""}`} role="status">{status}</div>
+          {counts && <div className="plan-summary"><div><b>{counts.ready}</b><span>ready</span></div><div><b>{counts.review}</b><span>to review</span></div><p>{resultKind === "Control plan" ? "First-fit control" : `${baselineCount} ready in the first-fit control`}<br /><span>{Object.values(decisions).filter(d => d === "approved").length} approved locally</span></p></div>}
+          {!result ? <div className="empty-plan"><span>↳</span><h3>Your inputs are ready for a fresh plan.</h3><p>Use {live ? "Run local agent" : "Replan this sample"} to calculate allocations and review their evidence.</p></div> : <>
+            <div className="allocation-list" aria-label="Request allocations">{payload.requests.map((r, i) => {
+              const id = `req-${i + 1}`, a = result.plan.allocations.find(a => a.request_id === id);
+              if (zone !== "all" && r.zone !== zone) return null;
+              return <button key={id} className={`allocation-row ${id === selected ? "allocation-row--selected" : ""}`} aria-pressed={id === selected} onClick={() => setSelected(id)}><span className="request-id">{id}<small>{title(r.zone)}</small></span><span className="request-need">{title(r.needs[0].item)} <small>{r.needs[0].units} {r.needs[0].units === 1 ? "unit" : "units"} · {a?.volunteer_id ?? "Unassigned"}</small></span><span className={`row-state ${a ? "row-state--ready" : "row-state--review"}`}>{decisions[id] ? title(decisions[id]) : a ? "Ready" : "Review"}</span><ChevronDown size={16} /></button>;
+            })}{!payload.requests.some(r => zone === "all" || r.zone === zone) && <p className="field-help">No requests in this zone.</p>}</div>
+            {(allocation || review) && <section className="evidence" aria-labelledby="evidence-title"><div className="evidence-heading"><p className="eyebrow">Review</p><h3 id="evidence-title">{selected} <span>{allocation ? "Allocation evidence" : "Needs a decision"}</span></h3></div><div className="evidence-body"><div>{allocation ? <><p>{allocation.items.map(i => `${i.units} ${i.item} from ${i.lot_id}`).join("; ")}.</p><p>{allocation.volunteer_id} covers {title(selectedRequest.zone)}. Stock and capacity are included in this plan.</p></> : <><p className="review-reason">{review?.reason === "inventory_shortage" ? "Not enough unexpired stock" : "No available volunteer capacity"}</p>{review?.evidence.map(e => <p key={e}>{e}</p>)}<p>Add the missing resource and replan, or mark this request for follow-up.</p></>}<p className="boundary-note">{allocation ? "Approval records a local decision. It does not dispatch a volunteer." : "Follow-up does not reserve stock or complete the request."}</p></div><div className="decision-actions">{decisions[selected] ? <><p className="decision-saved"><Check size={16} /> {decisions[selected] === "approved" ? "Approved locally" : "Marked for follow-up"}</p><button className="secondary-button" disabled={busy} onClick={undo}>Undo decision</button></> : <button className="secondary-button" disabled={busy} onClick={decide}>{allocation ? "Approve locally" : "Mark for follow-up"}</button>}</div></div></section>}
+          </>}
+          <details className="activity"><summary>Activity <span>{activity.length} {activity.length === 1 ? "event" : "events"}</span></summary>{activity.length ? <ol>{activity.map((a, i) => <li key={`${activity.length - i}-${a}`}>{a}</li>)}</ol> : <p>No decisions recorded yet.</p>}</details>
+        </section>
+      </div>
+      <footer className="page-footer"><span>Synthetic data only. No messages, deliveries or payments are sent.</span><span>Edits and approvals stay in this tab and reset on reload.</span></footer>
+    </main>
+  </div>;
 }

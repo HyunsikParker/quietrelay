@@ -29,7 +29,7 @@ export function parseAuthoritativePlan(value: unknown): AuthoritativePlan {
   if (!Array.isArray(value.external_actions) || value.external_actions.length !== 0) throw new Error();
   if (!isRecord(value.plan) || !hasExactKeys(value.plan, ["allocations", "reviews"])) throw new Error();
   if (!Array.isArray(value.plan.allocations) || !Array.isArray(value.plan.reviews)) throw new Error();
-  if (value.plan.allocations.length > 4 || value.plan.reviews.length > 1) throw new Error();
+  if (value.plan.allocations.length + value.plan.reviews.length > 1000) throw new Error();
   for (const allocation of value.plan.allocations) {
     if (!isRecord(allocation) || !hasExactKeys(allocation, ["request_id", "volunteer_id", "items"])) throw new Error();
     if (!isShortHandle(allocation.request_id, "req") || !isShortHandle(allocation.volunteer_id, "vol") || !Array.isArray(allocation.items) || allocation.items.length > 4) throw new Error();

@@ -9,9 +9,10 @@ The repository has two working parts:
 
 - A Strands agent that runs three policy-constrained tools against a local
   Ollama model and a deterministic stock-aware recovery planner.
-- A responsive web console that first shows the submitted control for one
-  synthetic fixture, then makes the loopback recovery delta visible alongside
-  the review, approval, audit, and undo flow.
+- An editable console for five synthetic requests. Change quantities, expiry
+  dates, priorities, zones, and volunteer capacity, then review the new plan.
+  The public page runs the deterministic tools in the browser; the local
+  console runs the Strands agent. Each mode is labeled on screen.
 
 Neither part sends messages, spends money, or dispatches a volunteer.
 
@@ -41,7 +42,9 @@ flowchart LR
     E --> F[Independently validate typed constraints]
     F --> G[Authoritative allocation and review JSON]
 
-    H[Synthetic console fixture] --> A
+    H[Editable synthetic console] --> A
+    H --> M[Browser-only tool preview: no model]
+    M --> I
     G --> I[Coordinator review]
     I --> J[Local approval or undo]
     J --> K[Local activity ledger]
@@ -58,7 +61,8 @@ Ollama is fixed to `127.0.0.1`, and the model receives the output of the
 validated planner rather than the source payload.
 
 The console keeps approvals in browser memory. Reloading the page clears them.
-Its only application data request is a same-origin POST to the Python server on
+The public preview makes no planning API request. In local agent mode, its only
+application data request is a same-origin POST to the Python server on
 numeric loopback. The server rejects non-local Host and Origin values, does not
 enable CORS, caps request, response, and static-asset sizes, uses a fixed input
 deadline and bounded request workers, and does not log request data.
@@ -94,19 +98,33 @@ cd ..
 uv run python scripts/serve_local.py
 ```
 
-Open `http://127.0.0.1:4173`. Select **Run local agent** to verify the pinned
-model digest, execute inspect, select, and validate, and load the authoritative
-recovery plan. The cold-start table shows the submitted control with three safe
-allocations and two local decisions. The verified recovery reassigns capacity
-to show four safe allocations and one local decision, without dispatching or
-sending anything.
-The interface supports zone filtering, decision review, a held-stock state, an
-approved oats substitute, an append-only activity ledger for the session, and
-undo. Substitute availability is recalculated from the current authoritative
-allocations, so a recovery that consumes stock disables an insufficient option
-before approval. Desktop and mobile use the same local state.
+Open `http://127.0.0.1:4173` with Ollama running. Edit the sample and select
+**Run local agent**. The server verifies the pinned model, runs the three Strands
+tools, and returns a typed plan. The console checks the result against the exact
+submitted input before showing it.
+
+The original sample has three ready requests in the first-fit control and four
+in the recovery plan. Set rice stock to **6** and volunteer 1 capacity to **3**
+to make all five requests ready. Expired stock is excluded. These are synthetic
+examples, not measured outcomes from a community organization.
+
+Select a request to inspect its allocation or shortage evidence. Ready requests
+can be approved locally; unresolved requests can be marked for follow-up.
+Follow-up does not reserve stock. Undo reverses a local decision. Editing any
+input or running a new plan clears earlier approvals. Activity is kept in the
+current tab only, with the latest 30 events visible.
+
+The [public preview](https://hyunsikparker.github.io/quietrelay/) calculates new
+inputs using a browser implementation of the deterministic planning tools. It
+does not run Strands or an LLM. Use `?mode=replay` on the local console to test
+that same browser mode. The input editor is limited to the five-request sample;
+it is not an import interface for real organization data.
 
 ## Verify the repository
+
+After `uv sync --dev` and `npm ci` in `frontend`, run `npm --prefix frontend run
+test:planner` to compare 24 frozen synthetic scenarios against the Python
+planner and check rejection of stale results, over-allocation and invalid inputs.
 
 ```bash
 uv run pytest
