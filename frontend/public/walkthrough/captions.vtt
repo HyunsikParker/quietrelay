@@ -1,0 +1,19 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:18.636
+Small food banks coordinate requests, stock that expires, and volunteers covering different areas. QuietRelay prepares that allocation plan for a coordinator to review. This is synthetic sample data, running on this computer. The first-fit control has three requests ready and two needing review.
+
+00:00:19.202 --> 00:00:35.199
+Run local agent starts a real Strands workflow with a local Qwen model. It inspects conflicts, selects one allowed recovery, and validates it. A separate deterministic check verifies the result. The model cannot invent stock or dispatch a volunteer.
+
+00:00:40.347 --> 00:00:53.778
+The recovery plan has four requests ready. One volunteer is reassigned, making room for the oats request. The rice shortage remains visible. Marking it for follow-up does not reserve stock. Undo reverses that local decision.
+
+00:00:55.095 --> 00:01:08.131
+Now change the rice stock from four to six, and volunteer one capacity from two to three. Editing inputs clears the previous result and approvals. Run the local agent again with these changed resources.
+
+00:01:22.862 --> 00:01:36.298
+All five requests are now ready. Open the rice request, inspect its stock and volunteer assignment, and approve it locally. The activity list records the decision. Undo removes the approval. Nothing is sent or delivered.
+
+00:01:37.397 --> 00:01:53.338
+The public demo lets you edit the same sample and calculate plans in your browser without a model. The repository includes the local agent setup and checks. This demonstration shows allocation consistency on synthetic inputs, not measured impact at a food bank.

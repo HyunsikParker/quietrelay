@@ -13,6 +13,7 @@ a { color: var(--ink); }
 .brand { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 700; letter-spacing: -.6px; }
 .relay-mark { width: 32px; height: 30px; stroke: var(--ink); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .masthead-note { font-size: 13px; color: var(--muted); }
+.masthead nav { margin-left: auto; display: flex; align-items: center; gap: 24px; }
 .masthead a { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; text-decoration: none; padding: 12px 0; }
 main { max-width: 1540px; margin: auto; padding: 24px 4vw 20px; }
 .page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 30px; margin-bottom: 22px; }
@@ -88,6 +89,11 @@ h3 span { margin-left: 8px; font-weight: 400; color: var(--muted); }
 .activity ol { padding-left: 20px; color: var(--muted); line-height: 1.7; }
 .activity li { margin-bottom: 8px; }
 .review-export { margin: 24px 20px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.review-snapshot { margin: 0 20px 24px; padding-top: 20px; border-top: 1px solid var(--line); }
+.review-snapshot p { font-size: 12px; line-height: 1.6; color: var(--muted); }
+.review-snapshot textarea { width: 100%; resize: vertical; border: 1px solid var(--line); border-radius: 0; padding: 14px; background: #f7f7f4; color: var(--ink); font: 12px/1.65 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.snapshot-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
+@media (max-width: 480px) { .masthead { flex-wrap: wrap; gap: 0 20px; padding-block: 10px; } .masthead nav { width: 100%; margin-left: 0; justify-content: space-between; } .review-snapshot { margin-inline: 18px; } }
 .review-export p { flex: 1; min-width: 180px; font-size: 12px; line-height: 1.6; color: var(--muted); }
 .empty-plan { min-height: 320px; padding: 50px 20px; border-top: 1px solid var(--line); margin: 0 20px; }
 .empty-plan > span { font-size: 38px; color: #455d4a; }

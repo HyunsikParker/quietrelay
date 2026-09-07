@@ -26,6 +26,9 @@ export function App() {
   const [decisions, setDecisions] = useState<Record<string, "approved" | "held">>({});
   const [activity, setActivity] = useState<string[]>([]);
   const [revision, setRevision] = useState(1);
+  const [snapshot, setSnapshot] = useState<string | null>(null);
+  const snapshotField = useRef<HTMLTextAreaElement>(null);
+  const snapshotVersion = useRef(0);
   const baselineCount = useMemo(() => { try { return previewPlan(payload, false).plan.allocations.length; } catch { return null; } }, [payload]);
   const allocation = result?.plan.allocations.find(a => a.request_id === selected);
   const review = result?.plan.reviews.find(r => r.request_id === selected);
@@ -34,12 +37,14 @@ export function App() {
 
   function edit(change: (p: Payload) => void) {
     if (running.current) return;
+    clearSnapshot();
     const next = structuredClone(payload); change(next); setPayload(next);
     setResult(null); setDecisions({}); setError(false);
     setStatus("Inputs changed. Replan before reviewing or approving.");
   }
   function reset() {
     if (running.current) return;
+    clearSnapshot();
     const next = initialPayload(); setPayload(next); setResult(previewPlan(next, false));
     setResultKind("Control plan"); setDecisions({}); setSelected("req-4"); setZone("all"); setRevision(r => r + 1);
     setError(false); setStatus("Original sample restored. Earlier activity remains below.");
@@ -47,6 +52,7 @@ export function App() {
   }
   async function run() {
     if (running.current) return;
+    clearSnapshot();
     try { validateInput(payload); } catch (e) { setError(true); setStatus(e instanceof Error ? e.message : "Check your inputs."); return; }
     running.current = true; setBusy(true); setError(false);
     setStatus(live ? "Local agent is inspecting, selecting and validating. This can take up to 50 seconds." : "Calculating from the current inputs…");
@@ -67,31 +73,59 @@ export function App() {
   }
   function decide() {
     if (running.current || !result || decisions[selected]) return;
+    clearSnapshot();
     const state = allocation ? "approved" : "held";
     setDecisions(d => ({ ...d, [selected]: state }));
     setActivity(a => [`Plan ${revision} · ${selected} ${state === "approved" ? "approved locally" : "marked for follow-up; no stock reserved"}.`, ...a].slice(0, 30));
   }
   function undo() {
     if (running.current || !decisions[selected]) return;
+    clearSnapshot();
     setDecisions(d => { const next = { ...d }; delete next[selected]; return next; });
     setActivity(a => [`Plan ${revision} · ${selected} decision undone.`, ...a].slice(0, 30));
+  }
+  function clearSnapshot() {
+    snapshotVersion.current += 1;
+    setSnapshot(null);
   }
   function saveReview() {
     if (running.current || !result || resultKind === "Control plan") return;
     try {
       const text = reviewText(payload, result, decisions, live ? "agent" : "preview");
-      const url = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }));
+      snapshotVersion.current += 1;
+      setSnapshot(text);
+      setError(false); setStatus("Review snapshot ready below. Copy it or download a text file. Nothing dispatched.");
+      requestAnimationFrame(() => snapshotField.current?.focus());
+    } catch (e) { setError(true); setStatus(e instanceof Error ? e.message : "Review could not be prepared."); }
+  }
+  async function copyReview() {
+    if (running.current || !snapshot) return;
+    const version = snapshotVersion.current;
+    try {
+      await navigator.clipboard.writeText(snapshot);
+      if (version !== snapshotVersion.current) return;
+      setError(false); setStatus("Review snapshot copied. Later edits are not included.");
+    } catch {
+      if (version !== snapshotVersion.current) return;
+      snapshotField.current?.focus(); snapshotField.current?.select();
+      setError(false); setStatus("Automatic copying is unavailable. The review text is selected; use your device’s Copy command.");
+    }
+  }
+  function downloadReview() {
+    if (running.current || !snapshot) return;
+    try {
+      const url = URL.createObjectURL(new Blob([snapshot], { type: "text/plain;charset=utf-8" }));
       const link = document.createElement("a");
       link.href = url; link.download = `quietrelay-review-plan-${revision}.txt`;
       document.body.append(link); link.click(); link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-      setError(false); setStatus("Review download requested. The snapshot includes all requests, current inputs and local decisions.");
-    } catch (e) { setError(true); setStatus(e instanceof Error ? e.message : "Review could not be saved."); }
+      setError(false); setStatus("Download requested. If no file appears, copy the review text below.");
+    } catch { setError(false); setStatus("Download unavailable. Copy the review text below instead."); }
   }
 
   return <div className="console">
     <a className="skip-link" href="#results">Skip to plan</a>
-    <header className="masthead"><Brand /><div className="masthead-note">Community allocation desk</div><a href="https://github.com/HyunsikParker/quietrelay#run-the-integrated-console" target="_blank" rel="noreferrer">Run locally <ArrowRight size={15} /></a></header>
+    <header className="masthead"><Brand /><div className="masthead-note">Community allocation desk</div><nav aria-label="Project evidence"><a href={`${import.meta.env.BASE_URL}walkthrough/index.html`}>Watch local agent</a><a href="https://github.com/HyunsikParker/quietrelay#run-the-integrated-console" target="_blank" rel="noreferrer">Run locally <ArrowRight size={15} /></a></nav></header>
     <main>
       <div className="page-heading"><div><p className="eyebrow">Sample data · 22 Aug 2026</p><h1>Allocation plan</h1></div></div>
       <div className="execution-note"><strong>{live ? "Live local agent" : "Interactive preview · no live model"}</strong><span>{live ? "Strands + Ollama on this device." : "Calculates in your browser. Run locally to use the Strands agent."}</span></div>
@@ -120,7 +154,8 @@ export function App() {
             })}{!payload.requests.some(r => zone === "all" || r.zone === zone) && <p className="field-help">No requests in this zone.</p>}</div>
             {(allocation || review) && <section className="evidence" aria-labelledby="evidence-title"><div className="evidence-heading"><p className="eyebrow">Review</p><h3 id="evidence-title">{selected} <span>{allocation ? "Allocation evidence" : "Needs a decision"}</span></h3></div><div className="evidence-body"><div>{allocation ? <><p>{allocation.items.map(i => `${i.units} ${i.item} from ${i.lot_id}`).join("; ")}.</p><p>{allocation.volunteer_id} covers {title(selectedRequest.zone)}. Stock and capacity are included in this plan.</p></> : <><p className="review-reason">{review?.reason === "inventory_shortage" ? "Not enough unexpired stock" : "No available volunteer capacity"}</p>{review?.evidence.map(e => <p key={e}>{e}</p>)}<p>Add the missing resource and replan, or mark this request for follow-up.</p></>}<p className="boundary-note">{allocation ? "Approval records a local decision. It does not dispatch a volunteer." : "Follow-up does not reserve stock or complete the request."}</p></div><div className="decision-actions">{decisions[selected] ? <><p className="decision-saved"><Check size={16} /> {decisions[selected] === "approved" ? "Approved locally" : "Marked for follow-up"}</p><button className="secondary-button" disabled={busy} onClick={undo}>Undo decision</button></> : <button className="secondary-button" disabled={busy} onClick={decide}>{allocation ? "Approve locally" : "Mark for follow-up"}</button>}</div></div></section>}
           </>}
-          <div className="review-export"><button className="secondary-button" disabled={busy || !result || resultKind === "Control plan"} onClick={saveReview}>Save review</button><p>Save all requests and current decisions as a text file. Replan first. Unreviewed requests remain marked as pending.</p></div>
+          <div className="review-export"><button className="secondary-button" disabled={busy || !result || resultKind === "Control plan"} onClick={saveReview}>Save review</button><p>Open a snapshot of all requests and decisions, then copy or download it. Unreviewed requests remain pending.</p></div>
+          {snapshot && <section className="review-snapshot" aria-labelledby="snapshot-title"><h3 id="snapshot-title">Review snapshot</h3><p>Current inputs and decisions. Changing either closes this snapshot.</p><textarea ref={snapshotField} aria-label="Review snapshot text" readOnly value={snapshot} rows={12} spellCheck={false} /><div className="snapshot-actions"><button className="secondary-button" onClick={copyReview}>Copy review</button><button className="secondary-button" onClick={downloadReview}>Download text</button><button className="text-button" onClick={clearSnapshot}>Close snapshot</button></div></section>}
           <details className="activity"><summary>Activity <span>{activity.length} {activity.length === 1 ? "event" : "events"}</span></summary>{activity.length ? <ol>{activity.map((a, i) => <li key={`${activity.length - i}-${a}`}>{a}</li>)}</ol> : <p>No decisions recorded yet.</p>}</details>
         </section>
       </div>

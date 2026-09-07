@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="QuietRelay local Strands agent: recorded allocation, review and input changes on synthetic data."><title>QuietRelay — local-agent walkthrough</title><style>
+:root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #202321; background: #f7f7f4; }
+* { box-sizing: border-box; } body { margin: 0; } main { max-width: 820px; padding: 28px 22px 48px; margin: auto; } a { color: inherit; } h1 { margin-top: 30px; font-size: clamp(24px, 5vw, 32px); font-weight: 550; letter-spacing: -.03em; } p { font-size: 14px; line-height: 1.7; } .date { color: #636a65; font-size: 12px; } video { display: block; margin: 24px auto; width: 100%; max-height: 72vh; background: #111; } details { border-top: 1px solid #dcddda; padding-top: 18px; margin-top: 28px; } summary { cursor: pointer; font-size: 14px; } :focus-visible { outline: 3px solid #455d4a; outline-offset: 3px; }
+</style></head><body><main>
+<a href="../">Back to the editable console</a>
+<h1>Watch the local agent</h1>
+<p class="date">Recorded September 6, 2026 · 1 min 54 sec · synthetic sample data</p>
+<p>Two real Strands runs prepare allocations for review. The recording shows a shortage, changed stock and volunteer capacity, approval, and undo.</p>
+<video controls playsinline preload="metadata" aria-label="QuietRelay local Strands agent walkthrough">
+<source src="local-agent-demo.mp4" type="video/mp4"><track src="captions.vtt" kind="captions" srclang="en" label="English">
+Your browser cannot play this recording. <a href="local-agent-demo.mp4">Open the MP4</a> or read the transcript below.
+</video>
+<p>The public console calculates plans in the browser without a model. This recording uses the local Strands and Ollama setup in the <a href="https://github.com/HyunsikParker/quietrelay#run-the-local-agent">repository</a>. No volunteer is dispatched.</p>
+<p>Idle gaps were shortened. This is a functional demonstration, not a continuous latency benchmark. Narration uses a synthetic voice. Review snapshot export was added after this recording; try <strong>Save review</strong> in the console.</p>
+<details><summary>Read the narration transcript</summary><p>Small food banks coordinate requests, stock that expires, and volunteers covering different areas. QuietRelay prepares that allocation plan for a coordinator to review. This is synthetic sample data, running on this computer. The first-fit control has three requests ready and two needing review.</p>
+<p>Run local agent starts a real Strands workflow with a local Qwen model. It inspects conflicts, selects one allowed recovery, and validates it. A separate deterministic check verifies the result. The model cannot invent stock or dispatch a volunteer.</p>
+<p>The recovery plan has four requests ready. One volunteer is reassigned, making room for the oats request. The rice shortage remains visible. Marking it for follow-up does not reserve stock. Undo reverses that local decision.</p>
+<p>Now change the rice stock from four to six, and volunteer one capacity from two to three. Editing inputs clears the previous result and approvals. Run the local agent again with these changed resources.</p>
+<p>All five requests are now ready. Open the rice request, inspect its stock and volunteer assignment, and approve it locally. The activity list records the decision. Undo removes the approval. Nothing is sent or delivered.</p>
+<p>The public demo lets you edit the same sample and calculate plans in your browser without a model. The repository includes the local agent setup and checks. This demonstration shows allocation consistency on synthetic inputs, not measured impact at a food bank.</p></details>
+</main></body></html>

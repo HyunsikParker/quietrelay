@@ -114,11 +114,21 @@ Follow-up does not reserve stock. Undo reverses a local decision. Editing any
 input or running a new plan clears earlier approvals. Activity is kept in the
 current tab only, with the latest 30 events visible.
 
-After replanning, **Save review** downloads a readable text snapshot of all five
+After replanning, **Save review** opens a readable text snapshot of all five
 requests, their current decisions, allocation or shortage evidence, and the
 input resources. Unreviewed requests stay explicitly pending. The file labels
 browser preview versus local agent results and records no dispatch. It remains
 available after the tab closes; subsequent edits do not update the saved file.
+Use **Copy review** or **Download text** to keep it. If the browser prevents
+either action, the full text remains selectable on screen. Changes to inputs,
+approvals, or follow-up decisions close the snapshot so it can be prepared again.
+
+The [local-agent walkthrough](https://hyunsikparker.github.io/quietrelay/walkthrough/)
+is a 1:54 recording from September 6. It shows real Strands runs, input edits,
+follow-up, approval, and undo using synthetic data. English captions and the
+narration transcript are included. Idle gaps were shortened; it is not a
+continuous latency benchmark. Review snapshot export was added after this
+recording and can be tried in the console.
 
 The [public preview](https://hyunsikparker.github.io/quietrelay/) calculates new
 inputs using a browser implementation of the deterministic planning tools. It
