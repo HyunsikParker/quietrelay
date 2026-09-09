@@ -415,6 +415,8 @@ class RecoverySessionV2:
             raise ValueError("select_recovery requires one prior inspection")
         if option_id not in self._plans:
             raise ValueError("recovery option is not allowlisted")
+        if option_id != self._best_option:
+            raise ValueError("recovery option violates deterministic selection policy")
         self._selected = option_id
         self._trace.append({"step": "select_recovery", "option_id": option_id})
         metrics = self._metrics[option_id]

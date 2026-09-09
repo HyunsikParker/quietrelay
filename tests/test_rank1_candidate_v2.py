@@ -216,6 +216,49 @@ def test_empty_queue_returns_exact_existing_schema_and_deterministic_tie() -> No
     assert result == {"external_actions": [], "plan": {"allocations": [], "reviews": []}}
 
 
+def test_tool_rejects_inferior_selection_without_advancing_or_exporting() -> None:
+    payload = _payload(
+        requests=[
+            _request("req-1", "north", 5, ("rice", 1)),
+            _request("req-2", "south", 4, ("rice", 1)),
+        ],
+        stock=[_stock("lot-1", "rice", 2)],
+        volunteers=[
+            _volunteer("vol-1", ["north", "south"]),
+            _volunteer("vol-2", ["north"]),
+        ],
+    )
+    session = RecoverySessionV2(json.dumps(payload))
+    options = _options(session)
+    assert options["baseline"]["allocated_requests"] == 1
+    assert options["stock_aware_incremental"]["allocated_requests"] == 2
+
+    with pytest.raises(ValueError, match="selection policy"):
+        session.select("baseline")
+    with pytest.raises(ValueError, match="allowlisted selection"):
+        session.validate()
+    with pytest.raises(ValueError, match="did not validate"):
+        session.authoritative_result()
+
+    session.select("stock_aware_incremental")
+    receipt = json.loads(session.validate())
+    assert receipt["metrics"]["allocated_requests"] == 2
+    assert receipt["external_actions"] == []
+    assert [row["step"] for row in receipt["audit"]["steps"]] == EXPECTED_STEPS
+    assert len(json.loads(session.authoritative_result())["plan"]["allocations"]) == 2
+
+
+def test_tool_enforces_deterministic_tie_break_before_validation() -> None:
+    session = RecoverySessionV2(json.dumps(_payload()))
+    options = _options(session)
+    assert options["baseline"]["allocated_requests"] == 0
+    assert options["stock_aware_incremental"]["allocated_requests"] == 0
+    with pytest.raises(ValueError, match="selection policy"):
+        session.select("stock_aware_incremental")
+    session.select("baseline")
+    assert json.loads(session.validate())["selected_option"] == "baseline"
+
+
 @pytest.mark.parametrize(
     "payload, message",
     [
