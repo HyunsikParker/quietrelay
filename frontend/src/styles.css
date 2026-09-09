@@ -102,7 +102,38 @@ h3 span { margin-left: 8px; font-weight: 400; color: var(--muted); }
 .page-footer { display: flex; justify-content: space-between; gap: 20px; color: var(--muted); font-size: 10px; padding: 20px 0; line-height: 1.6; }
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-@media (max-width: 1050px) { .desk { grid-template-columns: 290px minmax(0, 1fr); } .evidence-body { grid-template-columns: 1fr; gap: 12px; } .decision-actions { justify-self: start; } .plan-summary { gap: 18px; padding-inline: 0; flex-wrap: wrap; } .plan-summary p { margin-left: 0; } .field-triple { grid-template-columns: 45px 55px minmax(0, 1fr); } .allocation-row { grid-template-columns: 62px minmax(80px, 1fr) 60px 12px; gap: 8px; } }
-@media (max-width: 760px) { .masthead { min-height: 64px; padding-inline: 20px; } .masthead-note { display: none; } main { padding: 30px 20px 12px; } .page-heading { display: block; margin-bottom: 24px; } .intro { margin-top: 18px; font-size: 13px; } .execution-note { flex-wrap: wrap; gap: 6px 8px; } .execution-note > span:last-child { flex-basis: 100%; padding-left: 0; } .desk { grid-template-columns: 1fr; } .input-panel { border-right: 0; border-bottom: 1px solid var(--line); } .input-fields { display: grid; grid-template-columns: 1fr 1fr; column-gap: 24px; } .field-help { grid-column: 1 / -1; } .input-record:last-child { border-bottom: 1px solid var(--line); } .input-footer { margin-top: 12px; } .input-footer .primary-button { max-width: 360px; margin: auto; } .result-panel { padding: 0; } .allocation-row { grid-template-columns: 62px minmax(80px, 1fr) 60px 12px; } .page-footer { display: block; } .page-footer span { display: block; margin-bottom: 5px; } }
+@media (max-width: 1050px) { .desk { grid-template-columns: 290px minmax(0, 1fr); } .evidence-body { grid-template-columns: 1fr; gap: 12px; } .decision-actions { justify-self: start; } .plan-summary { gap: 18px; padding-inline: 0; flex-wrap: wrap; } .plan-summary p { margin-left: 0; } .field-triple { grid-template-columns: 45px 55px minmax(0, 1fr); } .allocation-row { grid-template-columns: 80px minmax(80px, 1fr) 60px 12px; gap: 8px; } }
+@media (max-width: 760px) { .masthead { min-height: 64px; padding-inline: 20px; } .masthead-note { display: none; } main { padding: 30px 20px 12px; } .page-heading { display: block; margin-bottom: 24px; } .intro { margin-top: 18px; font-size: 13px; } .execution-note { flex-wrap: wrap; gap: 6px 8px; } .execution-note > span:last-child { flex-basis: 100%; padding-left: 0; } .desk { grid-template-columns: 1fr; } .input-panel { border-right: 0; border-bottom: 1px solid var(--line); } .input-fields { display: grid; grid-template-columns: 1fr 1fr; column-gap: 24px; } .field-help { grid-column: 1 / -1; } .input-record:last-child { border-bottom: 1px solid var(--line); } .input-footer { margin-top: 12px; } .input-footer .primary-button { max-width: 360px; margin: auto; } .result-panel { padding: 0; } .allocation-row { grid-template-columns: 80px minmax(80px, 1fr) 60px 12px; } .page-footer { display: block; } .page-footer span { display: block; margin-bottom: 5px; } }
 @media (max-width: 480px) { main { padding-inline: 12px; } .masthead { padding-inline: 16px; } .input-fields { grid-template-columns: 1fr; } .section-heading, .result-panel .section-heading { padding-inline: 18px; } .panel-description { margin-inline: 18px; } .allocation-list { padding-inline: 8px; } .allocation-row { padding-inline: 10px; } .evidence, .activity, .plan-summary { margin-inline: 18px; } .plan-summary { gap: 22px; } .plan-summary p { flex-basis: 100%; } .run-status { padding-inline: 18px; } h2 { font-size: 18px; } .zone-filter { gap: 6px; } .zone-filter select { width: 75px; } .input-tabs button { min-height: 44px; } input, select { min-height: 44px; font-size: 16px; } .field-triple { grid-template-columns: 58px 70px minmax(0, 1fr); } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; scroll-behavior: auto !important; } }
+
+.workspace-bar { border-top: 1px solid var(--line); padding: 18px 0 22px; display: flex; gap: 18px; justify-content: space-between; align-items: start; }
+.workspace-bar strong { font-size: 13px; }
+.workspace-bar p { margin: 6px 0 0; font-size: 12px; line-height: 1.6; color: var(--muted); }
+.workspace-actions { display: flex; flex-wrap: wrap; gap: 8px 12px; max-width: 660px; }
+.workspace-actions .secondary-button { padding: 10px 14px; }
+.file-control { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; }
+.file-control input { max-width: 220px; font-size: 12px; padding: 5px; }
+.planning-date { margin: 14px 24px; }
+.input-fields { max-height: 570px; overflow-y: auto; padding-bottom: 16px; }
+.input-record > label { margin-bottom: 10px; }
+.need-row { display: grid; grid-template-columns: minmax(0, 1fr) 64px auto; gap: 8px; align-items: end; margin-top: 10px; }
+.zone-checks { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-bottom: 10px; }
+.zone-checks label { display: flex; align-items: center; gap: 6px; min-height: 36px; }
+.zone-checks input { width: 18px; height: 18px; min-height: 18px; accent-color: var(--ink); }
+.allocation-list { max-height: 490px; overflow-y: auto; }
+.data-dialog { width: min(720px, calc(100vw - 28px)); max-height: calc(100dvh - 40px); padding: 24px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); }
+.data-dialog::backdrop { background: #14181488; }
+.data-dialog .section-heading { padding: 0; }
+.data-dialog > p { font-size: 13px; line-height: 1.6; }
+.data-dialog > label { max-width: 220px; margin: 14px 0; }
+.data-dialog .input-tabs { margin-top: 16px; padding: 0; }
+.data-dialog textarea { width: 100%; resize: vertical; min-height: 160px; border: 1px solid #a1a8a2; padding: 10px; font: 13px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.data-dialog .file-control { max-width: none; }
+.data-dialog .primary-button { width: auto; }
+.import-summary { padding: 12px; background: #eef0ec; font-size: 13px; line-height: 1.6; }
+.import-summary p { margin: 5px 0 0; }
+@media (max-width: 1050px) { .workspace-bar { flex-direction: column; } }
+@media (max-width: 480px) { .data-dialog { padding: 16px; } .data-dialog textarea { font-size: 16px; } .workspace-actions { gap: 8px; } .workspace-actions .secondary-button { flex: 1; } .workspace-actions .file-control { width: 100%; } .planning-date { margin-inline: 18px; } }
+
+.expired-lot { display: block; margin-top: 5px; font-size: 11px; color: #694d36; font-weight: 400; }

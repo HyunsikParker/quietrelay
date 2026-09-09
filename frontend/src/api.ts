@@ -32,7 +32,7 @@ export function parseAuthoritativePlan(value: unknown): AuthoritativePlan {
   if (value.plan.allocations.length + value.plan.reviews.length > 1000) throw new Error();
   for (const allocation of value.plan.allocations) {
     if (!isRecord(allocation) || !hasExactKeys(allocation, ["request_id", "volunteer_id", "items"])) throw new Error();
-    if (!isShortHandle(allocation.request_id, "req") || !isShortHandle(allocation.volunteer_id, "vol") || !Array.isArray(allocation.items) || allocation.items.length > 4) throw new Error();
+    if (!isShortHandle(allocation.request_id, "req") || !isShortHandle(allocation.volunteer_id, "vol") || !Array.isArray(allocation.items) || !allocation.items.length || allocation.items.length > 100) throw new Error();
     for (const item of allocation.items) {
       if (!isRecord(item) || !hasExactKeys(item, ["lot_id", "item", "units"])) throw new Error();
       if (!isShortHandle(item.lot_id, "lot") || !["blankets", "milk", "oats", "rice"].includes(String(item.item)) || !Number.isSafeInteger(item.units) || Number(item.units) <= 0) throw new Error();

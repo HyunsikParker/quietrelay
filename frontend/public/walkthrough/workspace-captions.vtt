@@ -1,0 +1,43 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:05.220
+QuietRelay helps small community teams plan stock and volunteers.
+
+00:00:05.220 --> 00:00:13.110
+The local Strands agent inspects conflicts, selects a permitted plan, and validates it.
+
+00:00:13.110 --> 00:00:18.140
+Four requests are ready. The rice shortage remains unresolved.
+
+00:00:18.140 --> 00:00:27.280
+Import another queue: seven anonymous requests, six stock lots, and three volunteers. One request needs both rice and milk.
+
+00:00:27.280 --> 00:00:32.320
+Check all three tables before replacing the current inputs.
+
+00:00:32.320 --> 00:00:41.180
+Loading clears previous decisions. Now run the local agent.
+
+00:00:41.180 --> 00:00:47.230
+Six requests are ready. Expired rice is excluded, leaving one shortage.
+
+00:00:47.230 --> 00:00:52.240
+The allocation shows the original stock and volunteer IDs.
+
+00:00:52.240 --> 00:00:56.390
+Approve locally. No volunteer is dispatched and no payment is sent.
+
+00:00:56.390 --> 00:01:01.420
+Save, reload, and restore. Both the approval and follow-up decision survive.
+
+00:01:01.420 --> 00:01:07.560
+The handover includes every request. Five still await coordinator review.
+
+00:01:07.560 --> 00:01:12.580
+A changed input makes this saved plan inconsistent. It is rejected.
+
+00:01:12.580 --> 00:01:17.610
+Editing current inputs clears the old plan and approvals.
+
+00:01:17.610 --> 00:01:22.700
+A workspace file restores the review. This is a synthetic prototype, without field-impact evidence.

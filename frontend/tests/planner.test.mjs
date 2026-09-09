@@ -9,6 +9,21 @@ import { rolldown } from "rolldown";
 const frontend = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const root = resolve(frontend, "..");
 const cases = JSON.parse(readFileSync(join(frontend, "tests/scenarios.json"), "utf8"));
+// Expanded intake: canonical handles cross 9, split lots, multi-item requests,
+// empty resources, and both sides of the expiry boundary.
+let seed = 9102026;
+const pick = n => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed % n; };
+const items = ["rice", "milk", "blankets", "oats"], zones = ["north", "east", "south"];
+for (let sample = 0; sample < 60; sample++) {
+  const payload = { today: "2026-09-10",
+    requests: Array.from({ length: 1 + pick(100) }, (_, i) => ({ request_id: `req-${1000 + i}`, zone: zones[pick(3)], urgency: 1 + pick(5), needs: items.slice(0, 1 + pick(4)).map(item => ({ item, units: 1 + pick(10) })) })),
+    stock: Array.from({ length: sample === 0 ? 0 : 1 + pick(100) }, (_, i) => ({ lot_id: `lot-${2000 + i}`, item: items[pick(4)], units: 1 + pick(20), expires_on: ["2026-09-09", "2026-09-10", "2026-09-11"][pick(3)] })),
+    volunteers: Array.from({ length: sample === 1 ? 0 : 1 + pick(30) }, (_, i) => ({ volunteer_id: `vol-${3000 + i}`, zones: zones.slice(0, 1 + pick(3)), capacity: 1 + pick(10) })) };
+  cases.push({ name: `expanded-${sample}`, payload });
+}
+cases.push({ name: "one-request-100-lots", payload: { today: "2026-09-10", requests: [{ request_id: "req-900", zone: "north", urgency: 5, needs: [{ item: "rice", units: 100 }] }], stock: Array.from({ length: 100 }, (_, i) => ({ lot_id: `lot-${i + 1}`, item: "rice", units: 1, expires_on: "2026-09-10" })), volunteers: [{ volunteer_id: "vol-800", zones: ["north"], capacity: 1 }] } });
+cases.push({ name: "maximum-supported-input", payload: { today: "2026-09-10", requests: Array.from({ length: 100 }, (_, i) => ({ request_id: `req-${1000 + i}`, zone: zones[i % 3], urgency: 5, needs: items.map(item => ({ item, units: 100 })) })), stock: Array.from({ length: 100 }, (_, i) => ({ lot_id: `lot-${2000 + i}`, item: items[i % 4], units: 100, expires_on: "2026-09-10" })), volunteers: Array.from({ length: 30 }, (_, i) => ({ volunteer_id: `vol-${3000 + i}`, zones, capacity: 10 })) } });
+for (const c of cases) assert.ok(Buffer.byteLength(JSON.stringify(c.payload)) <= 65536, "frontend inputs fit the backend size limit");
 const expected = JSON.parse(execFileSync(process.env.QUIETRELAY_TEST_PYTHON || join(root, ".venv/bin/python"), ["-c", `
 import json,sys
 from quietrelay.agent import plan_payload

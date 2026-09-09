@@ -1,7 +1,7 @@
 # QuietRelay
 
 QuietRelay prepares a daily allocation plan for a small community organization.
-It matches synthetic requests with stock and volunteer capacity, using items with
+It matches anonymous requests with stock and volunteer capacity, using items with
 the earliest expiry first. When stock is short or no volunteer is available, it
 stops and gives a coordinator the evidence needed to decide what happens next.
 
@@ -9,8 +9,9 @@ The repository has two working parts:
 
 - A Strands agent that runs three policy-constrained tools against a local
   Ollama model and a deterministic stock-aware recovery planner.
-- An editable console for five synthetic requests. Change quantities, expiry
-  dates, priorities, zones, and volunteer capacity, then review the new plan.
+- A console for up to 100 requests, 100 stock lots and 30 volunteers. Import
+  CSV or pasted spreadsheet tables, or add records in the editor. Review a
+  plan, save its inputs and decisions, and restore them on another visit.
   The public page runs the deterministic tools in the browser; the local
   console runs the Strands agent. Each mode is labeled on screen.
 
@@ -35,19 +36,19 @@ Neither part sends messages, spends money, or dispatches a volunteer.
 
 ```mermaid
 flowchart LR
-    A[Synthetic request, stock, and volunteer JSON] --> B[Strict field and size validation]
+    A[Anonymous request, stock, and volunteer data] --> B[Strict field and size validation]
     B --> C[Stock-aware FEFO and augmenting-path options]
     C --> D[Inspect fixed aggregate conflicts]
     D --> E[Select one allowlisted recovery]
     E --> F[Independently validate typed constraints]
     F --> G[Authoritative allocation and review JSON]
 
-    H[Editable synthetic console] --> A
+    H[CSV intake and editable console] --> A
     H --> M[Browser-only tool preview: no model]
     M --> I
     G --> I[Coordinator review]
     I --> J[Local approval or undo]
-    J --> K[Local activity ledger]
+    J --> K[Validated workspace and handover export]
 
     K --> L[No message, payment, or real-world dispatch]
 ```
@@ -60,7 +61,13 @@ records. The parser replaces source IDs with per-run handles before planning.
 Ollama is fixed to `127.0.0.1`, and the model receives the output of the
 validated planner rather than the source payload.
 
-The console keeps approvals in browser memory. Reloading the page clears them.
+Work stays in browser memory until you choose **Save workspace**, which writes
+the anonymous inputs, verified plan and review decisions to local browser
+storage. **Restore saved work** checks that plan against its saved inputs before
+reopening it. The file contains no proof of a new model run. **Download
+workspace** and **Open workspace** provide the same workflow across devices.
+An inconsistent plan, unknown field or invalid decision is rejected before replacing
+current work. A failed browser save leaves work open and offers file download.
 The public preview makes no planning API request. In local agent mode, its only
 application data request is a same-origin POST to the Python server on
 numeric loopback. The server rejects non-local Host and Origin values, does not
@@ -98,7 +105,7 @@ cd ..
 uv run python scripts/serve_local.py
 ```
 
-Open `http://127.0.0.1:4173` with Ollama running. Edit the sample and select
+Open `http://127.0.0.1:4173` with Ollama running. Import tables or edit the sample and select
 **Run local agent**. The server verifies the pinned model, runs the three Strands
 tools, and returns a typed plan. The console checks the result against the exact
 submitted input before showing it.
@@ -114,7 +121,7 @@ Follow-up does not reserve stock. Undo reverses a local decision. Editing any
 input or running a new plan clears earlier approvals. Activity is kept in the
 current tab only, with the latest 30 events visible.
 
-After replanning, **Save review** opens a readable text snapshot of all five
+After replanning, **Prepare handover** opens a readable text snapshot of all
 requests, their current decisions, allocation or shortage evidence, and the
 input resources. Unreviewed requests stay explicitly pending. The file labels
 browser preview versus local agent results and records no dispatch. It remains
@@ -124,23 +131,55 @@ either action, the full text remains selectable on screen. Changes to inputs,
 approvals, or follow-up decisions close the snapshot so it can be prepared again.
 
 The [local-agent walkthrough](https://hyunsikparker.github.io/quietrelay/walkthrough/)
-is a 1:54 recording from September 6. It shows real Strands runs, input edits,
-follow-up, approval, and undo using synthetic data. English captions and the
-narration transcript are included. Idle gaps were shortened; it is not a
-continuous latency benchmark. Review snapshot export was added after this
-recording and can be tried in the console.
+starts with a 1:23 continuous recording from September 10. It shows two real
+Strands runs, a seven-request CSV import, expiry exclusion, approval, follow-up,
+save/reload/restore, handover download, and rejection of an inconsistent saved
+file. English captions and synthetic narration are included. The earlier
+September 6 recording remains below it for comparison. Both use synthetic data.
 
 The [public preview](https://hyunsikparker.github.io/quietrelay/) calculates new
 inputs using a browser implementation of the deterministic planning tools. It
 does not run Strands or an LLM. Use `?mode=replay` on the local console to test
-that same browser mode. The input editor is limited to the five-request sample;
-it is not an import interface for real organization data.
+that same browser mode. The initial five-request sample is synthetic. Imports accept anonymous IDs
+(`req-number`, `lot-number`, `vol-number`) and the supported item and zone
+catalogs; names, contact columns and free-form text are rejected. This remains
+a prototype: it has not been tested by a community organization.
+
+## Bring another day’s data
+
+Choose **Import tables**. Each tab begins with the current table and its exact
+column headings. Paste CSV or tab-separated spreadsheet cells, or open a CSV
+file. A request needing several items uses one row per item with the same
+request ID, zone and priority. Volunteer zones use `|`, such as `north|south`.
+A stock or volunteer table can contain just its header when none are available.
+
+**Check all tables** validates the three tables together and reports their
+record counts. **Use checked data** loads them and clears the old plan and
+approvals. Invalid tables leave current work intact. The editor also supports
+adding and removing requests, needed items, lots and volunteers.
+
+For a second synthetic example, import the [requests](frontend/public/examples/seven-requests/requests.csv),
+[stock](frontend/public/examples/seven-requests/stock.csv) and
+[volunteers](frontend/public/examples/seven-requests/volunteers.csv) tables with
+planning date **2026-08-22**. Six requests can be allocated; `req-706` needs
+three rice units after usable stock is exhausted. The expired 100-unit lot is
+excluded. `req-701` needs both rice and milk.
+
+Source IDs stay visible in the console and are mapped to per-run handles in
+the handover. Units are limited to 1–100, priority to 1–5 and volunteer capacity
+to 1–10 requests. The four items are rice, milk, blankets and oats; the three
+zones are north, east and south. CSV files stay on the device. In local agent
+mode, imported inputs go only to the same-origin loopback planner endpoint.
 
 ## Verify the repository
 
 After `uv sync --dev` and `npm ci` in `frontend`, run `npm --prefix frontend run
-test:planner` to compare 24 frozen synthetic scenarios against the Python
-planner and check rejection of stale results, over-allocation and invalid inputs.
+test:planner` to compare 24 frozen scenarios and 62 additional intake cases
+against the Python planner. The added cases cover 100 split lots for one
+request, larger record counts, multi-item requests, empty resources and
+expiry boundaries. `npm --prefix frontend run test:workspace` checks CSV/TSV
+parsing, source IDs, file tampering, stale decisions and failed storage
+readback. `npm --prefix frontend run test:review` checks the complete handover.
 
 ```bash
 uv run pytest

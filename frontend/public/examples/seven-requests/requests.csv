@@ -1,0 +1,9 @@
+request_id,zone,priority,item,units
+req-701,north,5,rice,3
+req-701,north,5,milk,1
+req-702,east,4,milk,2
+req-703,south,4,rice,4
+req-704,north,3,blankets,2
+req-705,east,2,oats,2
+req-706,south,2,rice,3
+req-707,north,1,milk,1

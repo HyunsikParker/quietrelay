@@ -4,7 +4,16 @@
 * { box-sizing: border-box; } body { margin: 0; } main { max-width: 820px; padding: 28px 22px 48px; margin: auto; } a { color: inherit; } h1 { margin-top: 30px; font-size: clamp(24px, 5vw, 32px); font-weight: 550; letter-spacing: -.03em; } p { font-size: 14px; line-height: 1.7; } .date { color: #636a65; font-size: 12px; } video { display: block; margin: 24px auto; width: 100%; max-height: 72vh; background: #111; } details { border-top: 1px solid #dcddda; padding-top: 18px; margin-top: 28px; } summary { cursor: pointer; font-size: 14px; } :focus-visible { outline: 3px solid #455d4a; outline-offset: 3px; }
 </style></head><body><main>
 <a href="../">Back to the editable console</a>
-<h1>Watch the local agent</h1>
+<h1>From intake to a saved review</h1>
+<p class="date">Recorded September 10, 2026 · 1 min 23 sec · synthetic data</p>
+<p>Import seven requests and their resources, run the local Strands agent, review a shortage, approve an allocation, and restore the decisions after a reload. The recording also checks handover download and rejection of an inconsistent saved file.</p>
+<video controls playsinline preload="metadata" aria-label="QuietRelay import and saved review walkthrough">
+<source src="workspace-demo.mp4" type="video/mp4"><track src="workspace-captions.vtt" kind="captions" srclang="en" label="English" default>
+<a href="workspace-demo.mp4">Open the MP4</a>
+</video>
+<p>This is a continuous browser recording with synthetic narration. The two agent runs use local Strands and Ollama; restoring a saved plan does not run a model. No organization supplied these inputs and no volunteer was dispatched.</p>
+<details><summary>Read the new walkthrough transcript</summary><p>QuietRelay helps small community teams plan stock and volunteers.</p><p>The local Strands agent inspects conflicts, selects a permitted plan, and validates it.</p><p>Four requests are ready. The rice shortage remains unresolved.</p><p>Import another queue: seven anonymous requests, six stock lots, and three volunteers. One request needs both rice and milk.</p><p>Check all three tables before replacing the current inputs.</p><p>Loading clears previous decisions. Now run the local agent.</p><p>Six requests are ready. Expired rice is excluded, leaving one shortage.</p><p>The allocation shows the original stock and volunteer IDs.</p><p>Approve locally. No volunteer is dispatched and no payment is sent.</p><p>Save, reload, and restore. Both the approval and follow-up decision survive.</p><p>The handover includes every request. Five still await coordinator review.</p><p>A changed input makes this saved plan inconsistent. It is rejected.</p><p>Editing current inputs clears the old plan and approvals.</p><p>A workspace file restores the review. This is a synthetic prototype, without field-impact evidence.</p></details>
+<h2>Earlier editable-console walkthrough</h2>
 <p class="date">Recorded September 6, 2026 · 1 min 54 sec · synthetic sample data</p>
 <p>Two real Strands runs prepare allocations for review. The recording shows a shortage, changed stock and volunteer capacity, approval, and undo.</p>
 <video controls playsinline preload="metadata" aria-label="QuietRelay local Strands agent walkthrough">
@@ -12,7 +21,7 @@
 Your browser cannot play this recording. <a href="local-agent-demo.mp4">Open the MP4</a> or read the transcript below.
 </video>
 <p>The public console calculates plans in the browser without a model. This recording uses the local Strands and Ollama setup in the <a href="https://github.com/HyunsikParker/quietrelay#run-the-local-agent">repository</a>. No volunteer is dispatched.</p>
-<p>Idle gaps were shortened. This is a functional demonstration, not a continuous latency benchmark. Narration uses a synthetic voice. Review snapshot export was added after this recording; try <strong>Save review</strong> in the console.</p>
+<p>Idle gaps were shortened. This is a functional demonstration, not a continuous latency benchmark. Narration uses a synthetic voice. Review snapshot export was added after this recording; try <strong>Prepare handover</strong> in the console.</p>
 <details><summary>Read the narration transcript</summary><p>Small food banks coordinate requests, stock that expires, and volunteers covering different areas. QuietRelay prepares that allocation plan for a coordinator to review. This is synthetic sample data, running on this computer. The first-fit control has three requests ready and two needing review.</p>
 <p>Run local agent starts a real Strands workflow with a local Qwen model. It inspects conflicts, selects one allowed recovery, and validates it. A separate deterministic check verifies the result. The model cannot invent stock or dispatch a volunteer.</p>
 <p>The recovery plan has four requests ready. One volunteer is reassigned, making room for the oats request. The rice shortage remains visible. Marking it for follow-up does not reserve stock. Undo reverses that local decision.</p>

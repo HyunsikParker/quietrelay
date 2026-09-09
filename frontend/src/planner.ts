@@ -10,16 +10,32 @@ export type Payload = {
 export const initialPayload = (): Payload => structuredClone(DEMO_PAYLOAD) as unknown as Payload;
 const compare = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
 
-/** Same bounded synthetic form is accepted by the local agent. No user text is sent. */
+export const ITEMS = ["rice", "milk", "blankets", "oats"];
+export const ZONES = ["north", "east", "south"];
+export const LIMITS = { requests: 100, stock: 100, volunteers: 30, units: 100, capacity: 10 };
+
+function record(value: unknown, keys: string[]): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value)
+    && Object.keys(value).sort().join("|") === [...keys].sort().join("|");
+}
+
+/** Validate the complete import boundary, including unknown fields and IDs. */
 export function validateInput(p: Payload) {
   const integer = (n: number, max: number) => Number.isSafeInteger(n) && n >= 1 && n <= max;
-  const date = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && Number.isFinite(Date.parse(s)) && new Date(s).toISOString().slice(0, 10) === s;
-  const zones = ["north", "east", "south"];
-  const items = ["rice", "milk", "blankets", "oats"];
-  if (!date(p.today) || p.requests.length !== 5 || p.stock.length !== 4 || p.volunteers.length !== 3) throw new Error("Invalid scenario.");
-  if (p.requests.some(r => !zones.includes(r.zone) || !integer(r.urgency, 5) || r.needs.length !== 1 || r.needs.some(n => !items.includes(n.item) || !integer(n.units, 100)))) throw new Error("Request quantities must be whole numbers from 1 to 100.");
-  if (p.stock.some(s => !items.includes(s.item) || !integer(s.units, 100) || !date(s.expires_on))) throw new Error("Check stock quantities and expiry dates.");
-  if (p.volunteers.some(v => !integer(v.capacity, 10) || !v.zones.length || v.zones.some(z => !zones.includes(z)))) throw new Error("Volunteer capacity must be a whole number from 1 to 10.");
+  const date = (s: string) => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s) && !s.startsWith("0000") && Number.isFinite(Date.parse(s)) && new Date(s).toISOString().slice(0, 10) === s;
+  const handle = (s: string, prefix: string) => typeof s === "string" && new RegExp(`^${prefix}-[0-9]{1,4}$`).test(s);
+  if (!record(p, ["today", "requests", "stock", "volunteers"]) || !date(p.today)) throw new Error("Use a valid planning date and only the expected data fields.");
+  if (!Array.isArray(p.requests) || !p.requests.length || p.requests.length > LIMITS.requests
+    || !Array.isArray(p.stock) || p.stock.length > LIMITS.stock
+    || !Array.isArray(p.volunteers) || p.volunteers.length > LIMITS.volunteers) throw new Error("Use 1–100 requests, up to 100 stock lots and up to 30 volunteers.");
+  if (p.requests.some(r => !record(r, ["request_id", "zone", "urgency", "needs"]) || !handle(r.request_id, "req") || !ZONES.includes(r.zone) || !integer(r.urgency, 5)
+    || !Array.isArray(r.needs) || !r.needs.length || r.needs.length > ITEMS.length
+    || r.needs.some(n => !record(n, ["item", "units"]) || !ITEMS.includes(n.item) || !integer(n.units, LIMITS.units))
+    || new Set(r.needs.map(n => n.item)).size !== r.needs.length)) throw new Error("Each request needs a req-number ID, a zone, priority 1–5 and distinct items with 1–100 whole units.");
+  if (p.stock.some(s => !record(s, ["lot_id", "item", "units", "expires_on"]) || !handle(s.lot_id, "lot") || !ITEMS.includes(s.item) || !integer(s.units, LIMITS.units) || !date(s.expires_on))) throw new Error("Each stock lot needs a lot-number ID, a supported item, 1–100 whole units and a valid expiry date.");
+  if (p.volunteers.some(v => !record(v, ["volunteer_id", "zones", "capacity"]) || !handle(v.volunteer_id, "vol") || !integer(v.capacity, LIMITS.capacity)
+    || !Array.isArray(v.zones) || !v.zones.length || v.zones.length > ZONES.length || v.zones.some(z => !ZONES.includes(z)) || new Set(v.zones).size !== v.zones.length)) throw new Error("Each volunteer needs a vol-number ID, distinct supported zones and capacity 1–10.");
+  if (new Set(p.requests.map(r => r.request_id)).size !== p.requests.length || new Set(p.stock.map(s => s.lot_id)).size !== p.stock.length || new Set(p.volunteers.map(v => v.volunteer_id)).size !== p.volunteers.length) throw new Error("IDs must be unique within requests, stock lots and volunteers.");
 }
 
 /** Deterministic preview of the agent's tools, never an LLM invocation. */
@@ -28,7 +44,8 @@ export function previewPlan(p: Payload, recovery = true): AuthoritativePlan {
   const requests = p.requests.map((r, i) => ({ ...r, request_id: `req-${i + 1}` })).sort((a, b) => b.urgency - a.urgency || compare(a.request_id, b.request_id));
   const stock = p.stock.map((s, i) => ({ ...s, lot_id: `lot-${i + 1}` })).filter(s => s.expires_on >= p.today).sort((a, b) => compare(a.expires_on, b.expires_on) || compare(a.lot_id, b.lot_id));
   const remaining = new Map(stock.map(s => [s.lot_id, s.units]));
-  const slots = p.volunteers.flatMap((v, i) => Array.from({ length: v.capacity }, (_, slot) => ({ key: `vol-${i + 1}/${slot}`, id: `vol-${i + 1}`, zones: v.zones })));
+  const slots = p.volunteers.map((v, i) => ({ ...v, id: `vol-${i + 1}` })).sort((a, b) => compare(a.id, b.id))
+    .flatMap(v => Array.from({ length: v.capacity }, (_, slot) => ({ key: `${v.id}/${slot}`, id: v.id, zones: v.zones })));
   const adjacency = new Map(requests.map(r => [r.request_id, slots.filter(s => s.zones.includes(r.zone))]));
   const occupant = new Map<string, string>();
   const assignment = new Map<string, string>();

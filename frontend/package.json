@@ -14,7 +14,8 @@
     "lint": "eslint .",
     "preview": "vite preview --host 127.0.0.1",
     "test:planner": "node tests/planner.test.mjs",
-    "test:review": "node tests/review.test.mjs"
+    "test:review": "node tests/review.test.mjs",
+    "test:workspace": "node tests/workspace.test.mjs"
   },
   "dependencies": {
     "lucide-react": "1.33.0",

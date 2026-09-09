@@ -16,7 +16,8 @@ try {
   const approved = result.plan.allocations[0].request_id, held = result.plan.reviews[0].request_id;
   const decisions = { [approved]: "approved", [held]: "held" };
   const text = reviewText(p, result, decisions, "preview");
-  assert.equal((text.match(/^req-\d+ \|/gm) || []).length, 5);
+  assert.equal((text.match(/^req-\d+ \(source req-\d+\) \|/gm) || []).length, 5);
+  p.requests.forEach((r, i) => assert.ok(text.includes(`req-${i + 1} (source ${r.request_id}) |`)));
   assert.equal((text.match(/AWAITING COORDINATOR REVIEW/g) || []).length, 3);
   assert.match(text, /FOLLOW-UP — NO STOCK RESERVED/);
   assert.match(text, /no model ran/);
