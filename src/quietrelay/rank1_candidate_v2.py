@@ -244,8 +244,10 @@ def _slot_graph(records: _Records) -> dict[str, tuple[_Slot, ...]]:
         ]
         for zone in volunteer.zones:
             slots_by_zone[zone].extend(slots)
+    # Requests in the same zone can share immutable adjacency without copying every slot.
+    adjacency_by_zone = {zone: tuple(slots) for zone, slots in slots_by_zone.items()}
     return {
-        request.request_id: tuple(slots_by_zone.get(request.zone, ()))
+        request.request_id: adjacency_by_zone.get(request.zone, ())
         for request in records.requests
     }
 
